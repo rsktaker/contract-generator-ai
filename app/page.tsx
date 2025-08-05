@@ -73,13 +73,13 @@ export default function HomePage() {
           {/* Radial Gradient Dot Pattern Background */}
           <div className="absolute inset-0 h-full w-full bg-transparent bg-[radial-gradient(#2563EB50_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_60%,transparent_100%)] z-0"></div>
           
-          <div className="w-full max-w-3xl mx-auto px-4 py-8 md:py-16 relative z-10">
+          <div className="w-full max-w-3.5xl mx-auto px-4 py-8 md:py-16 relative z-10">
             <div className="text-center">
-              <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6 md:mb-10">
+              <h1 className="text-3xl md:text-5xl mt-10 font-bold text-gray-900 mb-6 md:mb-10">
                 <Typewriter
                   onInit={(typewriter) => {
                     typewriter
-                      .typeString('Generate. Sign. Send.')
+                      .typeString('Make Contracts with AI.')
                       .pauseFor(2000)
                       .callFunction(() => {
                         // Remove cursor after 2 seconds
@@ -98,14 +98,13 @@ export default function HomePage() {
               </h1>
               
               {/* Contract Generation Card */}
-              <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl shadow-lg border border-gray-200 p-6 md:p-8 mt-10 mb-23">
                 <div className="space-y-6">
-                  {/* Textarea */}
-                  <div className="relative">
+                  {/* Textarea with Generate Button below */}
+                  <div className="w-full max-w-4xl mx-auto flex flex-col border border-gray-300 rounded-xl bg-white h-60 p-2 shadow-lg mt-10 mb-23">
                     <textarea
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      className="w-full p-4 pr-12 border border-gray-300 rounded-xl focus:ring-1 focus:ring-blue-200 h-40 resize-none text-[15px]"
+                      className="flex-1 bg-transparent outline-none resize-none text-[15px] p-6 h-full"
                       placeholder="Create a freelance contract between ABC Corp and John Smith for website development. $5,000 payment in two milestones, 6-week timeline."
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -114,76 +113,52 @@ export default function HomePage() {
                         }
                       }}
                     />
-                    {/* Attachment button */}
-                    <button
-                      type="button"
-                      className="absolute bottom-3 right-3 p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                      title="Attach files"
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  {/* Bottom Row */}
-                  <div className="flex items-center justify-between">
-                    {/* Upload files button */}
-                    <button
-                      type="button"
-                      className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1 cursor-pointer"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      Upload files
-                    </button>
-                    
-                    {/* Generate button with rainbow animation */}
-                    <button
-                      onClick={handleGenerateContract}
-                      disabled={isGenerating}
-                      className="group relative px-5 py-3 rounded-full font-medium text-white border-2 border-transparent overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                      style={{
-                        backgroundImage: 'linear-gradient(#2563eb, #2563eb), linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #5f27cd)',
-                        backgroundOrigin: 'padding-box, border-box',
-                        backgroundClip: 'padding-box, border-box',
-                        backgroundSize: '400% 400%',
-                        animation: 'gradientShift 3s ease infinite',
-                      }}
-                    >
-                      <span className="relative z-10 text-center text-md flex items-center gap-2">
-                        {isGenerating ? (
-                          <span className="flex items-center gap-1">
-                            Generating
-                            <span className="flex mt-1.5 gap-1">
-                              <span className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                              <span className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                              <span className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    <div className="flex justify-end mt-1">
+                      <button
+                        onClick={handleGenerateContract}
+                        disabled={isGenerating}
+                        className="group relative px-5 py-3 mr-2 mb-2 rounded-full font-medium text-white border-2 border-transparent overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        style={{
+                          backgroundImage: 'linear-gradient(#2563eb, #2563eb), linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #5f27cd)',
+                          backgroundOrigin: 'padding-box, border-box',
+                          backgroundClip: 'padding-box, border-box',
+                          backgroundSize: '400% 400%',
+                          animation: 'gradientShift 3s ease infinite',
+                        }}
+                      >
+                        <span className="relative z-10 text-center text-md flex items-center gap-2">
+                          {isGenerating ? (
+                            <span className="flex items-center gap-1">
+                              Generating
+                              <span className="flex mt-1.5 gap-1">
+                                <span className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                <span className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                <span className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                              </span>
                             </span>
-                          </span>
-                        ) : (
-                          <>
-                            Generate
-                            <svg 
-                              className="w-4 h-4 transition-transform group-hover:translate-x-1" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </>
-                        )}
-                      </span>
-                      <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                    </button>
+                          ) : (
+                            <>
+                              Generate
+                              <svg 
+                                className="w-4 h-4 transition-transform group-hover:translate-x-1" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </>
+                          )}
+                        </span>
+                        <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              
               
               {/* Credit Card Text */}
-              <p className="text-gray-600 text-lg font-thin inline-block mt-10" style={{ fontFamily: 'Poppins, sans-serif' }}>
+              <p className="text-gray-600 text-lg font-thin inline-block mt-30" style={{ fontFamily: 'Poppins, sans-serif' }}>
                 No Credit Card or Sign Up Required.
               </p>
             </div>
