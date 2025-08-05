@@ -1,0 +1,490 @@
+//app/contracts/[id]/page.tsx
+"use client";
+
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import Header from "@/components/Header";
+import { ContractEditor } from './components/ContractEditor';
+import { ChatInterface } from './components/ChatInterface';
+import { ErrorModal } from './components/ErrorModal';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { SkeletonLoaders } from './components/SkeletonLoaders';
+import { useContract } from './hooks/useContract';
+import { useMobileDetect } from './hooks/useMobileDetect';
+import { contractApi } from './utils/api';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+export default function ContractPage() {
+  const router = useRouter();
+  const params = useParams();
+  const contractId = params.id as string;
+  const { status } = useSession();
+  const isAuthenticated = status === 'authenticated';
+  const isMobileView = useMobileDetect();
+
+  // Contract management
+  const {
+    contract,
+    contractJson,
+    setContractJson,
+    isLoading,
+    saveStatus,
+    error,
+    setError,
+    setContract
+  } = useContract();
+
+  // Chat management
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isGeneratingInitialMessage, setIsGeneratingInitialMessage] = useState(true);
+  const [isProcessingChatMessage, setIsProcessingChatMessage] = useState(false);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+  const [isReplacingUnknowns, setIsReplacingUnknowns] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [dismissedUnknowns, setDismissedUnknowns] = useState<string[]>([]);
+
+  // Load chat messages from database
+  useEffect(() => {
+    if (contractId) {
+      loadChatMessages();
+    }
+  }, [contractId]);
+
+  const loadChatMessages = async () => {
+    try {
+      const response = await fetch(`/api/contracts/${contractId}/chat`);
+      if (response.ok) {
+        const data = await response.json();
+        setChatMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error('Error loading chat messages:', error);
+    } finally {
+      setIsGeneratingInitialMessage(false);
+    }
+  };
+
+  const startNewChat = async () => {
+    try {
+      const response = await fetch(`/api/contracts/${contractId}/chat`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        await loadChatMessages();
+      }
+    } catch (error) {
+      console.error('Error starting new chat:', error);
+    }
+  };
+
+  const processChatMessage = async (message: string) => {
+    // Immediately add user message to chat
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: message,
+      timestamp: new Date()
+    };
+    
+    // Add user message to local state immediately
+    setChatMessages(prev => [...prev, userMessage]);
+    
+    // Clear the input immediately
+    setNewMessage('');
+    
+    setIsProcessingChatMessage(true);
+    
+    try {
+      // First, analyze if this is a regeneration request
+      const regenerationAnalysisResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          contractId,
+          contractJson: contractJson,
+          isRegenerationAnalysis: true,
+          chatHistory: chatMessages
+        }),
+      });
+
+      if (regenerationAnalysisResponse.ok) {
+        const analysisData = await regenerationAnalysisResponse.json();
+        console.log('Regeneration analysis:', analysisData);
+        
+        // Parse the nested response if needed
+        let shouldRegenerate = false;
+        if (analysisData.response) {
+          try {
+            const parsedResponse = JSON.parse(analysisData.response);
+            shouldRegenerate = parsedResponse.shouldRegenerate;
+          } catch (e) {
+            console.error('Failed to parse regeneration analysis response:', e);
+          }
+        } else {
+          shouldRegenerate = analysisData.shouldRegenerate;
+        }
+        
+        if (shouldRegenerate) {
+          console.log('Regeneration needed, calling handleRegenerateContract');
+          // Handle regeneration with dismissed unknowns if any
+          await handleRegenerateContract(message, dismissedUnknowns.length > 0 ? dismissedUnknowns : undefined);
+          // Clear dismissed unknowns after regeneration
+          setDismissedUnknowns([]);
+          return;
+        }
+      } else {
+        console.error('Regeneration analysis failed:', regenerationAnalysisResponse.status);
+      }
+
+      // Regular chat message
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          contractId,
+          contractJson: contractJson
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Create AI response message
+        const aiMessage: ChatMessage = {
+          role: 'assistant',
+          content: data.response,
+          timestamp: new Date()
+        };
+        
+        // Add AI message to local state
+        setChatMessages(prev => [...prev, aiMessage]);
+        
+        // Save messages to database
+        await fetch(`/api/contracts/${contractId}/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message,
+            response: data.response
+          }),
+        });
+      }
+    } catch (error) {
+      console.error('Error processing chat message:', error);
+      // Add error message to chat
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while processing your message. Please try again.',
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsProcessingChatMessage(false);
+    }
+  };
+
+  // Handle contract updates
+  const handleContractUpdate = async (updatedContractJson: any) => {
+    setContractJson(updatedContractJson);
+  };
+
+  const handleRegenerateBlock = async (blockIndex: number, userInstructions: string) => {
+    if (!contractJson) return;
+    
+    try {
+      const data = await contractApi.regenerateBlock(contractJson, blockIndex, userInstructions);
+      setContractJson(data);
+    } catch (error) {
+      console.error('Error regenerating block:', error);
+      setError({
+        title: "Block Regeneration Failed",
+        message: error instanceof Error ? error.message : "Failed to regenerate block. Please try again."
+      });
+    }
+  };
+
+  const handleManualBlockEdit = async (blockIndex: number, updatedBlock: any) => {
+    if (!contractJson) return;
+    
+    const updatedContractJson = {
+      ...contractJson,
+      blocks: contractJson.blocks.map((block: any, index: number) =>
+        index === blockIndex ? updatedBlock : block
+      )
+    };
+    
+    setContractJson(updatedContractJson);
+  };
+
+  const handleReplaceUnknowns = async (replacements: Record<string, string>, dismissedUnknowns: string[]) => {
+    if (!contractJson) return;
+    
+    console.log('handleReplaceUnknowns called with:', { replacements, dismissedUnknowns });
+    setIsReplacingUnknowns(true);
+    
+    try {
+      // Replace unknowns in the contract text
+      let updatedText = contractJson.blocks[0]?.text || '';
+      console.log('Original text:', updatedText);
+      
+      Object.entries(replacements).forEach(([unknown, replacement]) => {
+        const regex = new RegExp(`\\[${unknown}\\]`, 'g');
+        console.log(`Replacing [${unknown}] with "${replacement}"`);
+        updatedText = updatedText.replace(regex, replacement);
+      });
+      
+      console.log('Updated text:', updatedText);
+      
+      // Update the contract
+      const updatedContractJson = {
+        ...contractJson,
+        blocks: contractJson.blocks.map((block: any, index: number) =>
+          index === 0 ? { ...block, text: updatedText } : block
+        )
+      };
+      
+      console.log('Setting new contractJson:', updatedContractJson);
+      setContractJson(updatedContractJson);
+      
+      // Store dismissed unknowns for potential regeneration
+      if (dismissedUnknowns.length > 0) {
+        setDismissedUnknowns(dismissedUnknowns);
+        
+        const dismissedList = dismissedUnknowns.length === 1 
+          ? dismissedUnknowns[0] 
+          : dismissedUnknowns.slice(0, -1).join(', ') + ' and ' + dismissedUnknowns[dismissedUnknowns.length - 1];
+        
+        const aiMessage: ChatMessage = {
+          role: 'assistant',
+          content: `I noticed you dismissed ${dismissedList}. Would you like me to regenerate the contract to not include ${dismissedUnknowns.length === 1 ? 'this unknown' : 'these unknowns'}?`,
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, aiMessage]);
+      }
+    } catch (error) {
+      console.error('Error replacing unknowns:', error);
+    } finally {
+      setIsReplacingUnknowns(false);
+    }
+  };
+
+  const handleRegenerateContract = async (userInstructions: string, dismissedUnknowns?: string[]) => {
+    if (!contractJson) return;
+    
+    console.log('Starting regeneration with instructions:', userInstructions, 'dismissedUnknowns:', dismissedUnknowns);
+    setIsRegenerating(true);
+    
+    try {
+      // Generate conversational AI message for regeneration
+      const initialResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Generate a brief, conversational response to: "${userInstructions}"`,
+          contractJson,
+          isRegenerationInitial: true
+        }),
+      });
+
+      let initialMessage = 'Got it, I\'ll regenerate the contract with your changes.';
+      if (initialResponse.ok) {
+        const initialData = await initialResponse.json();
+        initialMessage = initialData.response;
+      }
+
+      const aiMessage: ChatMessage = {
+        role: 'assistant',
+        content: initialMessage,
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, aiMessage]);
+      
+      console.log('Calling regeneration API...');
+      // Call regeneration API
+      const response = await fetch('/api/regenerateContract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contractId,
+          contractJson,
+          userInstructions,
+          dismissedUnknowns
+        }),
+      });
+
+      console.log('Regeneration API response status:', response.status);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Regeneration successful, updating contract');
+        setContractJson(data.contractJson);
+        
+        // Generate completion message with unknowns check
+        const completionResponse = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: "Generate completion message",
+            contractJson: data.contractJson,
+            isSummary: true
+          }),
+        });
+
+        let completionMessage = 'Contract has been regenerated with your requested changes.';
+        if (completionResponse.ok) {
+          const completionData = await completionResponse.json();
+          completionMessage = completionData.response;
+        }
+        
+        const completionMsg: ChatMessage = {
+          role: 'assistant',
+          content: completionMessage,
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, completionMsg]);
+      } else {
+        console.error('Regeneration API failed:', response.status, await response.text());
+        const errorMsg: ChatMessage = {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error while regenerating the contract. Please try again.',
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, errorMsg]);
+      }
+    } catch (error) {
+      console.error('Error regenerating contract:', error);
+      const errorMsg: ChatMessage = {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while regenerating the contract. Please try again.',
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!contractJson || !contract) return;
+    
+    setIsDownloadingPDF(true);
+    try {
+      const blob = await contractApi.generatePDF(contract._id, contractJson);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contract-${contract._id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      setError({
+        title: "PDF Generation Failed",
+        message: "Failed to generate PDF. Please try again."
+      });
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
+  if (isLoading || !contractJson) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <Header authenticated={isAuthenticated} />
+        <div className="flex flex-col flex-1 bg-gray-50 overflow-hidden">
+          <SkeletonLoaders />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <Header authenticated={isAuthenticated} />
+        <ErrorModal 
+          isOpen={true}
+          onClose={() => setError(null)}
+          title={error.title}
+          message={error.message}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden">
+      <Header authenticated={isAuthenticated} />
+      
+      <div className="flex flex-1 bg-gray-50 overflow-hidden">
+        {/* Left: Contract Editor */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <ContractEditor
+            contractJson={contractJson}
+            currentParty="PartyA"
+            onSignatureClick={() => {}}
+            onRegenerateBlock={handleRegenerateBlock}
+            onManualBlockEdit={handleManualBlockEdit}
+            saveStatus={saveStatus}
+            onShowPreview={() => {}}
+            onDownloadPDF={handleDownloadPDF}
+            isDownloadingPDF={isDownloadingPDF}
+          />
+        </div>
+
+        {/* Right: Chat + Send Panel */}
+        <div className="w-full lg:w-5/12 flex flex-col space-y-4 p-4 min-h-0">
+          {/* Chat Interface */}
+          <div className="flex-1 min-h-0">
+            <ChatInterface
+              chatMessages={chatMessages}
+              isGeneratingInitialMessage={isGeneratingInitialMessage}
+              isProcessingChatMessage={isProcessingChatMessage}
+              newMessage={newMessage}
+              onNewMessageChange={setNewMessage}
+              onSendMessage={processChatMessage}
+              onNewChat={startNewChat}
+              contractText={contractJson?.blocks?.[0]?.text || ''}
+              onReplaceUnknowns={handleReplaceUnknowns}
+              onRegenerateContract={handleRegenerateContract}
+              isReplacingUnknowns={isReplacingUnknowns}
+              isRegenerating={isRegenerating}
+            />
+          </div>
+
+          {/* Sign Button - Fixed at Bottom */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => {
+                router.push(`/contracts/${contractId}/sign`);
+              }}
+              className="w-full py-4 text-white rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg bg-black  flex items-center justify-center text-lg font-medium"
+            >
+              Sign →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
