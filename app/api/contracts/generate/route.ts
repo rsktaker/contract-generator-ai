@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateContractData } from "@/lib/openai";
+import { contractAgent } from "@/lib/agent";
 import Contract from "@/models/Contract";
 import { connectToDatabase } from "@/lib/mongodb";
 import { getServerSession } from "next-auth/next";
@@ -64,7 +64,21 @@ export async function POST(request: NextRequest) {
       ? `Today is ${currentDate}. The user is anonymous. Please generate a contract where the user's name should be represented as a bracketed unknown like [Your Name] that can be filled in later. ${prompt}`
       : `Today is ${currentDate}. This is the user's name: ${userName}. ${prompt}`;
 
-    const contractData = await generateContractData(userPrompt);
+    // Generate contract using the new contract agent
+    const result = await contractAgent.generateContract(userPrompt, {
+      isAnonymous,
+      userName
+    });
+    
+    // Create contract data structure from the agent result
+    const contractData = {
+      title: result.text.split('\n')[0]?.replace(/^\**/, '') || 'Generated Contract',
+      content: result.text,
+      parties: [
+        { name: isAnonymous ? '[Your Name]' : userName, role: 'Party 1' },
+        { name: '[Other Party Name]', role: 'Party 2' }
+      ]
+    };
 
     // XXX: Define a new schema so the database can store the new contract data better.
     const contractJson = {

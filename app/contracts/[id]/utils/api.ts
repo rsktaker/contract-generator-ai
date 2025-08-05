@@ -56,18 +56,52 @@ export const contractApi = {
 
 export const chatApi = {
   async sendMessage(message: string, contractJson: ContractJson, chatHistory: any[], options?: any) {
+    // Use the main AI SDK chat endpoint with proper format
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a professional contract assistant helping with this contract: ${contractJson.title || 'Untitled Contract'}
+
+Contract context: ${JSON.stringify(contractJson, null, 2)}
+
+Your role is to help analyze, improve, and answer questions about this contract.`
+      },
+      ...chatHistory.map((msg: any) => ({
+        role: msg.role,
+        content: msg.content
+      })),
+      {
+        role: 'user',
+        content: message
+      }
+    ];
+
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message,
-        contractJson,
-        chatHistory,
-        ...options
-      }),
+      body: JSON.stringify({ messages }),
     });
+    
     if (!response.ok) throw new Error('Failed to send chat message');
-    return response.json();
+    
+    // Parse streaming response
+    const text = await response.text();
+    // Extract the actual response from streaming format
+    const lines = text.split('\n').filter(line => line.startsWith('data: '));
+    let responseContent = '';
+    
+    for (const line of lines) {
+      try {
+        const data = JSON.parse(line.substring(6)); // Remove 'data: '
+        if (data.type === 'text-delta') {
+          responseContent += data.delta;
+        }
+      } catch (e) {
+        // Skip invalid JSON lines
+      }
+    }
+    
+    return { response: responseContent || 'I apologize, but I encountered an error processing your request.' };
   },
 
   async regenerateContract(contractJson: ContractJson, userPrompt: string) {

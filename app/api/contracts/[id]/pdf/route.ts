@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContractPDF } from '@/lib/pdf-generator';
 import { getContractById } from '@/lib/mailer';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const contractId = params.id;
+    const { id: contractId } = await params;
     
     // Get contract from database
     const contract = await getContractById(contractId);
@@ -52,16 +52,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: contractId } = await params;
     const { contractJson } = await request.json();
-    const pdfBuffer = await generateContractPDF(contractJson, params.id);
+    const pdfBuffer = await generateContractPDF(contractJson, contractId);
     
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="contract-${params.id}.pdf"`,
+        'Content-Disposition': `attachment; filename="contract-${contractId}.pdf"`,
       },
     });
   } catch (error) {

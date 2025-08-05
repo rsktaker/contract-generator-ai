@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Header from "@/components/Header";
-import { ContractEditor } from './components/ContractEditor';
+import { ContractView } from './components/ContractView';
 import { ChatInterface } from './components/ChatInterface';
 import { ErrorModal } from './components/ErrorModal';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -101,36 +101,57 @@ export default function ContractPage() {
     setIsProcessingChatMessage(true);
     
     try {
-      // First, analyze if this is a regeneration request
+      // First, analyze if this is a regeneration request using the updated API
       const regenerationAnalysisResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message,
-          contractId,
-          contractJson: contractJson,
-          isRegenerationAnalysis: true,
-          chatHistory: chatMessages
+          messages: [
+            {
+              role: 'system',
+              content: `Analyze if this user message requires contract regeneration. Contract: ${JSON.stringify(contractJson, null, 2)}`
+            },
+            ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
+            {
+              role: 'user',
+              content: `Should I regenerate the contract for this request: "${message}"? Respond with JSON: {"shouldRegenerate": true/false, "reason": "explanation"}`
+            }
+          ]
         }),
       });
 
       if (regenerationAnalysisResponse.ok) {
-        const analysisData = await regenerationAnalysisResponse.json();
-        console.log('Regeneration analysis:', analysisData);
+        // Parse streaming response for regeneration analysis
+        const analysisText = await regenerationAnalysisResponse.text();
+        let analysisContent = '';
         
-        // Parse the nested response if needed
-        let shouldRegenerate = false;
-        if (analysisData.response) {
+        // Extract content from streaming format
+        const analysisLines = analysisText.split('\n').filter(line => line.startsWith('data: '));
+        for (const line of analysisLines) {
           try {
-            const parsedResponse = JSON.parse(analysisData.response);
-            shouldRegenerate = parsedResponse.shouldRegenerate;
+            const data = JSON.parse(line.substring(6));
+            if (data.type === 'text-delta') {
+              analysisContent += data.delta;
+            }
           } catch (e) {
-            console.error('Failed to parse regeneration analysis response:', e);
+            // Skip invalid JSON lines
           }
-        } else {
-          shouldRegenerate = analysisData.shouldRegenerate;
+        }
+        
+        console.log('Regeneration analysis content:', analysisContent);
+        
+        // Try to parse JSON response
+        let shouldRegenerate = false;
+        try {
+          const parsedResponse = JSON.parse(analysisContent);
+          shouldRegenerate = parsedResponse.shouldRegenerate;
+        } catch (e) {
+          // If not JSON, check if content contains regeneration keywords
+          shouldRegenerate = analysisContent.toLowerCase().includes('regenerat') || 
+                           analysisContent.toLowerCase().includes('modify') ||
+                           analysisContent.toLowerCase().includes('change');
         }
         
         if (shouldRegenerate) {
@@ -145,26 +166,49 @@ export default function ContractPage() {
         console.error('Regeneration analysis failed:', regenerationAnalysisResponse.status);
       }
 
-      // Regular chat message
+      // Regular chat message using the updated API
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message,
-          contractId,
-          contractJson: contractJson
+          messages: [
+            {
+              role: 'system',
+              content: `You are a contract assistant helping with this contract: ${contractJson.title || 'Contract'}. Contract details: ${JSON.stringify(contractJson, null, 2)}`
+            },
+            ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
+            {
+              role: 'user',
+              content: message
+            }
+          ]
         }),
       });
 
       if (response.ok) {
-        const data = await response.json();
+        // Parse streaming response
+        const text = await response.text();
+        let responseContent = '';
+        
+        // Extract content from streaming format
+        const lines = text.split('\n').filter(line => line.startsWith('data: '));
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.substring(6)); // Remove 'data: '
+            if (data.type === 'text-delta') {
+              responseContent += data.delta;
+            }
+          } catch (e) {
+            // Skip invalid JSON lines
+          }
+        }
         
         // Create AI response message
         const aiMessage: ChatMessage = {
           role: 'assistant',
-          content: data.response,
+          content: responseContent || 'I apologize, but I encountered an error processing your request.',
           timestamp: new Date()
         };
         
@@ -437,9 +481,9 @@ export default function ContractPage() {
       <Header authenticated={isAuthenticated} />
       
       <div className="flex flex-1 bg-gray-50 overflow-hidden">
-        {/* Left: Contract Editor */}
+        {/* Left: Contract View */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <ContractEditor
+          <ContractView
             contractJson={contractJson}
             currentParty="PartyA"
             onSignatureClick={() => {}}

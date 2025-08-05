@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { regenerateBlockJson } from '@/lib/openai';
+import { contractAgent } from '@/lib/agent';
 
 interface Signature {
   party: string;
@@ -42,23 +42,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Regenerate the specific block
-    console.log('Calling regenerateBlockJson with:', {
+    // Regenerate the specific block using the new contract agent
+    console.log('Regenerating block with agent:', {
       blockIndex,
       userPrompt,
       blocksCount: contractJson.blocks.length
     });
     
-    const updatedContractJson = await regenerateBlockJson(
-      contractJson,
-      blockIndex,
-      userPrompt
+    const result = await contractAgent.generateContract(
+      `Regenerate block ${blockIndex} of this contract based on user instructions: ${userPrompt}
+      
+Current contract: ${JSON.stringify(contractJson, null, 2)}`,
+      { isAnonymous: true }
     );
 
-    console.log('regenerateBlockJson returned:', {
+    // Update the specific block with the new content
+    const updatedContractJson = {
+      ...contractJson,
+      blocks: contractJson.blocks.map((block: any, index: number) =>
+        index === blockIndex ? { ...block, text: result.text } : block
+      )
+    };
+
+    console.log('Block regeneration completed:', {
       hasBlocks: !!updatedContractJson?.blocks,
       blocksCount: updatedContractJson?.blocks?.length,
-      hasUnknowns: !!updatedContractJson?.unknowns
+      regeneratedBlock: blockIndex
     });
 
     // Validate the result before sending

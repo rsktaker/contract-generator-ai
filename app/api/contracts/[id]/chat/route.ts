@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import Chat from '@/models/Chat';
 import Contract from '@/models/Contract';
+import { contractAgent } from '@/lib/agent';
 
 // GET - Load chat messages for a contract
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectToDatabase();
     
-    const contractId = params.id;
+    const { id: contractId } = await params;
     
     // Verify contract exists
     const contract = await Contract.findById(contractId);
@@ -26,24 +27,19 @@ export async function GET(
     let chat = await Chat.findOne({ contractId });
     
     if (!chat) {
-      // Generate initial AI message instead of hardcoded message
-      const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: "Generate initial assessment",
-          contractJson: JSON.parse(contract.content),
-          isInitialMessage: true
-        }),
-      });
-
+      // Generate initial AI message using the new contract agent
       let initialContent = "Hello! I'm here to help you with your contract. Please let me know what you'd like to improve or add.";
       
-      if (response.ok) {
-        const data = await response.json();
-        initialContent = data.response;
+      try {
+        const contractContent = JSON.parse(contract.content);
+        const result = await contractAgent.generateContract(
+          `Assess this contract and provide a helpful introduction. Contract: ${JSON.stringify(contractContent, null, 2)}`,
+          { isAnonymous: true }
+        );
+        initialContent = result.text;
+      } catch (error) {
+        console.error('Error generating initial message:', error);
+        // Use fallback message
       }
 
       // Create new chat with AI-generated initial message
@@ -72,12 +68,12 @@ export async function GET(
 // POST - Add a new message to the chat
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectToDatabase();
     
-    const contractId = params.id;
+    const { id: contractId } = await params;
     const { message, response } = await request.json();
     
     if (!message) {
@@ -131,12 +127,12 @@ export async function POST(
 // DELETE - Clear chat messages
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectToDatabase();
     
-    const contractId = params.id;
+    const { id: contractId } = await params;
     
     // Find chat and clear messages
     const chat = await Chat.findOne({ contractId });

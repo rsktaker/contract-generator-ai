@@ -5,7 +5,6 @@ import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getRoot, $getSelection, $createParagraphNode, $createTextNode, EditorState, $isRangeSelection } from 'lexical';
@@ -161,7 +160,7 @@ export function ContractEditor({
                   format: 0,
                   mode: "normal",
                   style: "",
-                  text: "",
+                  text: "Start typing your contract...",
                   type: "text",
                   version: 1
                 }
@@ -185,6 +184,11 @@ export function ContractEditor({
     // Convert contract text to Lexical format with bold parsing
     const contractText = contractJson.blocks[0]?.text || '';
     const paragraphs = contractText.split('\n\n').filter((p: string) => p.trim());
+    
+    // Ensure we always have at least one paragraph
+    if (paragraphs.length === 0) {
+      paragraphs.push('Start typing your contract...');
+    }
     
     const children = paragraphs.map((paragraph: string) => {
       const parsedParts = parseMarkdownBold(paragraph);
