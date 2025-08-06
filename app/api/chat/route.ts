@@ -58,12 +58,33 @@ FORMATTING REQUIREMENTS:
 
 CHAT RESPONSES (Right Side Only):
 - Brief acknowledgments
-- Questions for clarification
+- Questions for clarification  
 - Helpful suggestions
 - Status updates
+- Guide users to fill out bracketed placeholders
 - NO CONTRACT CONTENT in chat responses
 
-The writeContractTool will handle ALL contract generation. Your job is conversational support only.`,
+AFTER GENERATING A CONTRACT:
+When you see a contract has been generated with bracketed placeholders like [Your Name], [Other Party Name], [Date], etc., immediately provide helpful guidance:
+
+"## Let's fill out your contract! 📝
+
+I've generated your contract. Now let's personalize it with your information:
+
+**Party Information:**
+- Who is this contract between? (replace [Your Name] and [Other Party Name])
+- What are the business addresses?
+
+**Important Dates:**
+- When does this contract take effect? ([Effective Date])
+- What's the duration or end date?
+
+**Key Details:**
+- What specific amounts, terms, or deliverables need to be specified?
+
+Just let me know these details and I can update the contract for you!"
+
+The writeContractTool will handle ALL contract generation. Your job is conversational support and guidance.`,
       stopWhen: stepCountIs(10), // Allow multi-step tool usage
       tools,
       temperature: 0.2,

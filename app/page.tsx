@@ -44,7 +44,9 @@ export default function HomePage() {
 
       if (response.ok) {
         const { contract } = await response.json();
-        router.push(`/contracts/${contract._id}`);
+        // Navigate immediately with the prompt as URL parameter
+        const encodedPrompt = encodeURIComponent(prompt.trim());
+        router.push(`/contracts/${contract._id}?prompt=${encodedPrompt}`);
       } else {
         const errorData = await response.json();
         alert(errorData.message || "Failed to generate contract. Please try again.");

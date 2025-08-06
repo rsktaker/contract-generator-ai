@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Header from "@/components/Header";
 import { ContractView } from './components/ContractView';
@@ -22,10 +22,14 @@ interface ChatMessage {
 export default function ContractPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const contractId = params.id as string;
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';
   const isMobileView = useMobileDetect();
+  
+  // Get initial prompt from URL parameters
+  const initialPrompt = searchParams?.get('prompt') || null;
 
   // Contract management
   const {
@@ -55,6 +59,14 @@ export default function ContractPage() {
       loadChatMessages();
     }
   }, [contractId]);
+
+  // Auto-send initial prompt if we have one and no existing chat messages
+  useEffect(() => {
+    if (initialPrompt && !isGeneratingInitialMessage && chatMessages.length === 0) {
+      console.log('[CONTRACT-PAGE] Auto-sending initial prompt:', initialPrompt);
+      processChatMessage(initialPrompt);
+    }
+  }, [initialPrompt, isGeneratingInitialMessage, chatMessages.length]);
 
   const loadChatMessages = async () => {
     try {
@@ -248,6 +260,23 @@ export default function ContractPage() {
           console.log('Updating contract with tool result:', updatedContractJson);
           if (updatedContractJson && setContractJson) {
             setContractJson(updatedContractJson);
+            
+            // Save updated contract content to database so Sign page can access it
+            try {
+              await fetch(`/api/contracts/${contractId}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  content: updatedContractJson,
+                  title: updatedContractJson.title
+                }),
+              });
+              console.log('Saved updated contract content to database');
+            } catch (error) {
+              console.error('Error saving contract content to database:', error);
+            }
           }
         }
         
@@ -350,6 +379,23 @@ export default function ContractPage() {
       console.log('Setting new contractJson:', updatedContractJson);
       setContractJson(updatedContractJson);
       
+      // Save updated contract content to database so Sign page can access it
+      try {
+        await fetch(`/api/contracts/${contractId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: updatedContractJson,
+            title: updatedContractJson.title
+          }),
+        });
+        console.log('Saved contract content with replaced unknowns to database');
+      } catch (error) {
+        console.error('Error saving contract content to database:', error);
+      }
+      
       // Store dismissed unknowns for potential regeneration
       if (dismissedUnknowns.length > 0) {
         setDismissedUnknowns(dismissedUnknowns);
@@ -425,6 +471,23 @@ export default function ContractPage() {
         const data = await response.json();
         console.log('Regeneration successful, updating contract');
         setContractJson(data.contractJson);
+        
+        // Save updated contract content to database so Sign page can access it
+        try {
+          await fetch(`/api/contracts/${contractId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              content: data.contractJson,
+              title: data.contractJson.title
+            }),
+          });
+          console.log('Saved regenerated contract content to database');
+        } catch (error) {
+          console.error('Error saving regenerated contract content to database:', error);
+        }
         
         // Generate completion message with unknowns check
         const completionResponse = await fetch('/api/chat', {

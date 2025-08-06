@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { contractAgent } from '@/lib/agent';
+import { tools } from '@/lib/tools';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,51 +24,31 @@ IMPORTANT: Remove these dismissed unknowns from the contract:
 ${dismissedUnknowns.map((unknown: string) => `- ${unknown}`).join('\n')}`;
     }
 
-    // Use the new contract agent
-    console.log('[REGENERATE] Calling contractAgent.generateContract with prompt:', prompt);
-    const result = await contractAgent.generateContract(prompt, { 
-      isAnonymous: true,
-      userName: 'Contract User'
-    });
-
-    console.log('[REGENERATE] Agent result:');
-    console.log('- Text length:', result.text?.length || 0);
-    console.log('- Tool calls count:', result.toolCalls?.length || 0);
-    console.log('- Tool results count:', result.toolResults?.length || 0);
+    // Use writeContractTool directly
+    console.log('[REGENERATE] Calling writeContractTool with prompt:', prompt);
     
-    if (result.toolResults && result.toolResults.length > 0) {
-      console.log('[REGENERATE] Tool results:');
-      result.toolResults.forEach((tr, index) => {
-        console.log(`- Tool ${index}:`, {
-          toolName: tr.toolName,
-          resultType: typeof tr.result,
-          result: typeof tr.result === 'object' ? JSON.stringify(tr.result, null, 2) : tr.result
-        });
-      });
-    }
-
-    // Extract the contract content from tool results instead of AI text
-    let regeneratedText = result.text;
+    // Determine contract type
+    const contractType = prompt.toLowerCase().includes('nda') ? 'nda' : 
+                        prompt.toLowerCase().includes('service') ? 'service' : 'custom';
     
-    // Check if writeContractTool was used and extract its result
-    if (result.toolResults && result.toolResults.length > 0) {
-      const contractTool = result.toolResults.find(tool => 
-        tool.toolName === 'writeContractTool' && tool.result && typeof tool.result === 'object'
-      );
-      
-      if (contractTool && contractTool.result) {
-        const toolResult = contractTool.result as any;
-        regeneratedText = toolResult.content || regeneratedText;
-        console.log('[REGENERATE] Using writeContractTool result. Content length:', regeneratedText?.length || 0);
-        console.log('[REGENERATE] First 200 chars:', regeneratedText?.substring(0, 200) + '...');
-      } else {
-        console.log('[REGENERATE] No writeContractTool result found, using AI text response');
-        console.log('[REGENERATE] AI text response length:', regeneratedText?.length || 0);
-      }
+    if (!tools.writeContractTool || !tools.writeContractTool.execute) {
+      throw new Error('writeContractTool is not available');
     }
+    
+    const generatedContract = await tools.writeContractTool.execute(
+      {
+        contractType,
+        userPrompt: prompt
+      },
+      {
+        toolCallId: '',
+        messages: []
+      } // Provide an empty options object or appropriate options
+    );
 
-    // Remove [End of Document] if it appears
-    const cleanedText = regeneratedText.replace(/\[End of Document\]/gi, '').trim();
+    // Use the direct tool result
+    const cleanedText = generatedContract.replace(/\[End of Document\]/gi, '').trim();
+    console.log('[REGENERATE] Regenerated contract length:', cleanedText.length);
 
     // Update the contract with regenerated content
     const updatedContractJson = {

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { contractAgent } from "@/lib/agent";
+import { tools } from "@/lib/tools";
 import Contract from "@/models/Contract";
 import { connectToDatabase } from "@/lib/mongodb";
 import { getServerSession } from "next-auth/next";
@@ -61,29 +61,62 @@ export async function POST(request: NextRequest) {
 
     const isAnonymous = userName === "Anonymous User";
 
-    // Stream the contract generation using AI SDK
-    const result = await contractAgent.generateContractStream(prompt, {
-      isAnonymous,
-      userId,
-      userName
+    // Use writeContractTool directly (this route may not be actively used)
+    const contractType = prompt.toLowerCase().includes('nda') ? 'nda' : 
+                        prompt.toLowerCase().includes('service') ? 'service' : 'custom';
+    
+    if (!tools.writeContractTool || !tools.writeContractTool.execute) {
+      throw new Error("Contract tool is not available");
+    }
+    
+    const contractContent = await tools.writeContractTool.execute(
+      {
+        contractType,
+        userPrompt: prompt
+      },
+      {
+        toolCallId: "",
+        messages: []
+      } // Provide an empty options object or the appropriate options
+    );
+    
+    // Create and save contract
+    const contractTitle = contractContent.split('\n')[0]?.replace(/\*\*/g, '').trim() || 'Generated Contract';
+    
+    const contract = await Contract.create({
+      userId: userId,
+      title: contractTitle,
+      type: contractType,
+      requirements: prompt,
+      content: JSON.stringify({
+        title: contractTitle,
+        type: contractType,
+        parties: [
+          { name: isAnonymous ? '[Your Name]' : userName, role: 'Party 1' },
+          { name: '[Other Party Name]', role: 'Party 2' }
+        ],
+        blocks: [
+          {
+            text: contractContent,
+            signatures: []
+          }
+        ]
+      }),
+      parties: [
+        { name: isAnonymous ? '[Your Name]' : userName, role: 'Party 1', signed: false, signatureId: null },
+        { name: '[Other Party Name]', role: 'Party 2', signed: false, signatureId: null }
+      ],
+      status: "draft",
+      isAnonymous: isAnonymous,
+      generatedAt: new Date()
     });
 
-    // Return proper UI message stream response
-    return result.toUIMessageStreamResponse({
-      onFinish: async (options) => {
-        console.log('Contract generation finished for user:', userId);
-        
-        // TODO: Save contract to database when streaming completes
-        // This would require collecting the final result from the stream
-        try {
-          await User.findByIdAndUpdate(userId, {
-            $inc: { contractsCreated: 1 }
-          });
-        } catch (dbError) {
-          console.error('Failed to update user contract count:', dbError);
-        }
-      },
+    // Update user contract count
+    await User.findByIdAndUpdate(userId, {
+      $inc: { contractsCreated: 1 }
     });
+
+    return Response.json({ contract }, { status: 201 });
 
   } catch (error) {
     console.error("Error in generate-stream:", error);

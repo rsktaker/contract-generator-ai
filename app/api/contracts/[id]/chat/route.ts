@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import Chat from '@/models/Chat';
 import Contract from '@/models/Contract';
-import { contractAgent } from '@/lib/agent';
 
 // GET - Load chat messages for a contract
 export async function GET(
