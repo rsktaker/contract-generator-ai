@@ -8,7 +8,6 @@ import Header from "@/components/Header";
 import { ContractView } from './components/ContractView';
 import { ChatInterface } from './components/ChatInterface';
 import { ErrorModal } from './components/ErrorModal';
-import { LoadingSpinner } from './components/LoadingSpinner';
 import { SkeletonLoaders } from './components/SkeletonLoaders';
 import { useContract } from './hooks/useContract';
 import { useMobileDetect } from './hooks/useMobileDetect';
@@ -176,7 +175,7 @@ export default function ContractPage() {
           messages: [
             {
               role: 'system',
-              content: `You are a contract assistant helping with this contract: ${contractJson.title || 'Contract'}. Contract details: ${JSON.stringify(contractJson, null, 2)}`
+              content: `You are a contract assistant helping with this contract: ${contractJson?.title || contract?.title || 'Contract'}. Contract details: ${JSON.stringify(contractJson, null, 2)}`
             },
             ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
             {
@@ -192,16 +191,63 @@ export default function ContractPage() {
         const text = await response.text();
         let responseContent = '';
         
-        // Extract content from streaming format
+        // Extract content from streaming format and check for tool calls
         const lines = text.split('\n').filter(line => line.startsWith('data: '));
+        let toolResults: any[] = [];
+        let toolCalls: any[] = [];
+        
+        console.log('[CHAT-PROCESS] Processing streaming response with', lines.length, 'lines');
+        
         for (const line of lines) {
           try {
             const data = JSON.parse(line.substring(6)); // Remove 'data: '
+            console.log('[CHAT-PROCESS] Line type:', data.type, data);
+            
             if (data.type === 'text-delta') {
               responseContent += data.delta;
+            } else if (data.type === 'tool-result') {
+              toolResults.push(data);
+              console.log('[CHAT-PROCESS] Tool result received:', JSON.stringify(data, null, 2));
+            } else if (data.type === 'tool-call') {
+              toolCalls.push(data);
+              console.log('[CHAT-PROCESS] Tool call detected:', JSON.stringify(data, null, 2));
             }
           } catch (e) {
-            // Skip invalid JSON lines
+            console.log('[CHAT-PROCESS] Failed to parse line:', line, e);
+          }
+        }
+        
+        console.log('[CHAT-PROCESS] Summary:');
+        console.log('- Response content length:', responseContent.length);
+        console.log('- Tool calls found:', toolCalls.length);
+        console.log('- Tool results found:', toolResults.length);
+        
+        // Check for writeContractTool results and update contract display
+        const contractToolResult = toolResults.find(result => 
+          result.toolName === 'writeContractTool' || 
+          (result.result && result.result.content)
+        );
+        
+        if (contractToolResult && contractToolResult.result) {
+          console.log('Found writeContractTool result, updating contract display');
+          const toolResult = contractToolResult.result;
+          
+          // Update the contract with the tool result
+          const updatedContractJson = {
+            ...contractJson,
+            title: toolResult.title || contractJson?.title || 'Generated Contract',
+            blocks: [
+              {
+                text: toolResult.content || toolResult.text || contractJson?.blocks?.[0]?.text || '',
+                signatures: contractJson?.blocks?.[0]?.signatures || []
+              }
+            ],
+            unknowns: contractJson?.unknowns || [] // Ensure unknowns is always an array
+          };
+          
+          console.log('Updating contract with tool result:', updatedContractJson);
+          if (updatedContractJson && setContractJson) {
+            setContractJson(updatedContractJson);
           }
         }
         
@@ -223,7 +269,7 @@ export default function ContractPage() {
           },
           body: JSON.stringify({
             message,
-            response: data.response
+            response: responseContent
           }),
         });
       }
@@ -485,12 +531,7 @@ export default function ContractPage() {
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <ContractView
             contractJson={contractJson}
-            currentParty="PartyA"
-            onSignatureClick={() => {}}
-            onRegenerateBlock={handleRegenerateBlock}
-            onManualBlockEdit={handleManualBlockEdit}
             saveStatus={saveStatus}
-            onShowPreview={() => {}}
             onDownloadPDF={handleDownloadPDF}
             isDownloadingPDF={isDownloadingPDF}
           />

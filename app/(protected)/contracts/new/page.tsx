@@ -8,7 +8,7 @@ import ContractSummary from "@/components/ContractSummary";
 import { server_log } from '@/app/actions/log';
 import FileUploadZone from "@/components/FileUploadZone";
 import AttachmentList from "@/components/AttachmentList";
-import { parseDocument } from "@/lib/documentParser";
+import { parseDocument } from "@/lib/archived/documentParser";
 
 import Link from "next/link";
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { contractAgent } from "@/lib/agent";
+import { tools } from "@/lib/tools";
 import Contract from "@/models/Contract";
 import { connectToDatabase } from "@/lib/mongodb";
 import { getServerSession } from "next-auth/next";
@@ -53,27 +53,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate contract using the new simplified approach
-    const currentDate = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    
     const isAnonymous = userName === "Anonymous User";
     const userPrompt = isAnonymous 
-      ? `Today is ${currentDate}. The user is anonymous. Please generate a contract where the user's name should be represented as a bracketed unknown like [Your Name] that can be filled in later. ${prompt}`
-      : `Today is ${currentDate}. This is the user's name: ${userName}. ${prompt}`;
+      ? `The user is anonymous. Use bracketed placeholders like [Your Name] for unknown information. ${prompt}`
+      : `User's name: ${userName}. ${prompt}`;
 
-    // Generate contract using the new contract agent
-    const result = await contractAgent.generateContract(userPrompt, {
-      isAnonymous,
-      userName
+    // Generate contract using writeContractTool directly
+    console.log('[CONTRACT-GENERATE] Calling writeContractTool with prompt:', userPrompt);
+    
+    // Determine contract type from prompt
+    const contractType = userPrompt.toLowerCase().includes('nda') ? 'nda' : 
+                        userPrompt.toLowerCase().includes('service') ? 'service' : 'custom';
+    
+    const contractContent = await tools.writeContractTool.execute({
+      contractType,
+      userPrompt
     });
     
+    console.log('[CONTRACT-GENERATE] Generated contract length:', contractContent?.length || 0);
+    
+    // Extract title from first line of generated contract
+    const firstLine = contractContent.split('\n')[0]?.replace(/^\**/, '') || 'Generated Contract';
+    const contractTitle = firstLine
+      .replace(/^Here.*?generated\s*/i, '')
+      .replace(/^Here.*?is\s*/i, '')
+      .replace(/^The\s+/i, '')
+      .replace(/\s+with.*$/i, '')
+      .replace(/\*\*/g, '')
+      .trim() || 'Generated Contract';
+
     // Create contract data structure from the agent result
     const contractData = {
-      title: result.text.split('\n')[0]?.replace(/^\**/, '') || 'Generated Contract',
-      content: result.text,
+      title: contractTitle,
+      content: contractContent,
       parties: [
         { name: isAnonymous ? '[Your Name]' : userName, role: 'Party 1' },
         { name: '[Other Party Name]', role: 'Party 2' }
@@ -91,7 +103,7 @@ export async function POST(request: NextRequest) {
       })),
       blocks: [
         {
-          text: contractData.text,
+          text: contractData.content,
           signatures: []
         }
       ],
