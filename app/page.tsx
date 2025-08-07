@@ -31,9 +31,12 @@ export default function HomePage() {
       return
     }
 
+    console.log('[LANDING-PAGE] Generate button clicked, setting loading state...');
     setIsGenerating(true)
 
+    // Create contract first, then redirect immediately
     try {
+      console.log('[LANDING-PAGE] Making API call to /api/contracts/generate...');
       const response = await fetch("/api/contracts/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,21 +45,31 @@ export default function HomePage() {
         }),
       });
 
+      console.log('[LANDING-PAGE] API response received, status:', response.status);
+
       if (response.ok) {
         const { contract } = await response.json();
-        // Navigate immediately with the prompt as URL parameter
+        console.log('[LANDING-PAGE] Contract created with ID:', contract._id);
+        
+        // Navigate immediately - don't wait for anything else
         const encodedPrompt = encodeURIComponent(prompt.trim());
-        router.push(`/contracts/${contract._id}?prompt=${encodedPrompt}`);
+        const redirectUrl = `/contracts/${contract._id}?prompt=${encodedPrompt}`;
+        console.log('[LANDING-PAGE] Redirecting to:', redirectUrl);
+        
+        router.push(redirectUrl);
+        return; // Exit immediately after navigation
       } else {
+        console.error('[LANDING-PAGE] API error response:', response.status);
         const errorData = await response.json();
         alert(errorData.message || "Failed to generate contract. Please try again.");
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("[LANDING-PAGE] Error in handleGenerateContract:", error);
       alert("An error occurred while generating the contract. Please try again.");
-    } finally {
-
     }
+    
+    console.log('[LANDING-PAGE] Resetting loading state...');
+    setIsGenerating(false);
   };
 
   return (

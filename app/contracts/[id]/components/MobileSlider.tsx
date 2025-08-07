@@ -28,6 +28,7 @@ interface MobileSliderProps {
   onSendChatMessage: (message: string) => void;
 }
 
+
 export const MobileSlider: React.FC<MobileSliderProps> = (props) => {
   const [activeTab, setActiveTab] = useState<'contract' | 'info'>('contract');
   const [startX, setStartX] = useState(0);

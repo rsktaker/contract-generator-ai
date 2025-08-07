@@ -8,7 +8,7 @@ import Header from "@/components/Header";
 import { ContractView } from './components/ContractView';
 import { ChatInterface } from './components/ChatInterface';
 import { ErrorModal } from './components/ErrorModal';
-import { SkeletonLoaders } from './components/SkeletonLoaders';
+import { AnimatedLoading } from './components/AnimatedLoading';
 import { useContract } from './hooks/useContract';
 import { useMobileDetect } from './hooks/useMobileDetect';
 import { contractApi } from './utils/api';
@@ -42,6 +42,66 @@ export default function ContractPage() {
     setError,
     setContract
   } = useContract();
+
+  // Polling for contract updates when content is placeholder
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null;
+    
+    // Check if contract has placeholder content
+    const hasPlaceholderContent = contract && contractJson && (
+      contractJson.title === "Generating Contract..." ||
+      (contractJson.blocks && contractJson.blocks[0]?.text === "Contract is being generated...")
+    );
+    
+    if (hasPlaceholderContent) {
+      console.log('[CONTRACT-PAGE] Contract is generating, starting polling...');
+      
+      pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/contracts/${contractId}`);
+          if (response.ok) {
+            const data = await response.json();
+            const updatedContract = data.contract || data;
+            
+            // Parse content to check if it's still placeholder
+            let parsedContent = null;
+            if (updatedContract.content) {
+              parsedContent = typeof updatedContract.content === 'string' 
+                ? JSON.parse(updatedContract.content) 
+                : updatedContract.content;
+            }
+            
+            const stillPlaceholder = parsedContent && (
+              parsedContent.title === "Generating Contract..." ||
+              (parsedContent.blocks && parsedContent.blocks[0]?.text === "Contract is being generated...")
+            );
+            
+            console.log('[CONTRACT-PAGE] Polling update - still placeholder:', stillPlaceholder);
+            
+            if (!stillPlaceholder) {
+              console.log('[CONTRACT-PAGE] Contract ready, stopping polling');
+              setContract(updatedContract);
+              setContractJson(parsedContent);
+              
+              // Clear polling
+              if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[CONTRACT-PAGE] Polling error:', error);
+        }
+      }, 2000); // Poll every 2 seconds
+    }
+    
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [contract, contractJson, contractId, setContract, setContractJson]);
 
   // Chat management
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -560,12 +620,12 @@ export default function ContractPage() {
     }
   };
 
-  if (isLoading || !contractJson) {
+  if (isLoading) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <Header authenticated={isAuthenticated} />
         <div className="flex flex-col flex-1 bg-gray-50 overflow-hidden">
-          <SkeletonLoaders />
+          <AnimatedLoading />
         </div>
       </div>
     );

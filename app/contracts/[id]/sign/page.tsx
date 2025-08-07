@@ -152,19 +152,6 @@ Best regards,
         {/* Left: Contract with Signature Blocks */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto p-8">
-            {/* Contract Header */}
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {contractJson.title || 'CONTRACT AGREEMENT'}
-              </h1>
-              <div className="text-sm text-gray-500">
-                Date: {new Date().toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </div>
-            </div>
 
             {/* Contract Text */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8">

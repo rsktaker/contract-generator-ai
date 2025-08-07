@@ -1,6 +1,7 @@
 "use client";
 
 import { SaveStatusIndicator } from './SaveStatusIndicator';
+import { AnimatedLoading } from './AnimatedLoading';
 
 
 interface ContractViewProps {
@@ -19,13 +20,27 @@ export function ContractView({
 
   if (!contractJson || !contractJson.blocks || contractJson.blocks.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">No contract content available</div>
+      <div className="h-full flex flex-col overflow-hidden">
+        <AnimatedLoading />
       </div>
     );
   }
 
   const contractText = contractJson.blocks[0]?.text || '';
+  
+  // Check if this is placeholder content - show loading animation instead
+  const isPlaceholderContent = (
+    contractJson.title === "Generating Contract..." ||
+    contractText === "Contract is being generated..."
+  );
+  
+  if (isPlaceholderContent) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        <AnimatedLoading />
+      </div>
+    );
+  }
   
   // Debug logging
   console.log('ContractView - contractJson:', contractJson);

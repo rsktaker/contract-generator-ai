@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { UnknownsPanel } from './UnknownsPanel';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -131,14 +130,6 @@ export function ChatInterface({
       {/* Input */}
       <div className="p-4 pt-0">
         <div className="flex space-x-2">
-          <div className="flex-1">
-            <UnknownsPanel
-              contractText={contractText}
-              onReplaceUnknowns={onReplaceUnknowns}
-              isReplacing={isReplacingUnknowns}
-              onExpandChange={setIsUnknownsPanelExpanded}
-            />
-          </div>
           {/* Spacer so that unknown panel is aligned with the input */}
           <button
             className="px-4 bg-white text-white"
