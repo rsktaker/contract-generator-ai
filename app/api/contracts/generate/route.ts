@@ -94,16 +94,22 @@ async function generateContractInBackground(
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[CONTRACT-GENERATE] Starting POST request...');
   try {
+    console.log('[CONTRACT-GENERATE] Connecting to database...');
     await connectToDatabase();
+    console.log('[CONTRACT-GENERATE] Database connected successfully');
 
     // Get the session to check if user is authenticated
+    console.log('[CONTRACT-GENERATE] Getting user session...');
     const session = await getServerSession(authOptions);
+    console.log('[CONTRACT-GENERATE] Session:', session ? 'authenticated' : 'anonymous');
     let userId: string;
     let userName: string;
 
     if (!session || !session.user || !session.user.id) {
       // Create anonymous user for unauthenticated requests
+      console.log('[CONTRACT-GENERATE] Creating anonymous user...');
       const anonymousUser = await User.create({
         name: "Anonymous User",
         email: `anonymous-${Date.now()}@contractgenerator.ai`,
@@ -129,8 +135,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the prompt from the request body
+    console.log('[CONTRACT-GENERATE] Parsing request body...');
     const body = await request.json();
     const { prompt } = body;
+    console.log('[CONTRACT-GENERATE] Prompt:', prompt);
 
     if (!prompt) {
       return NextResponse.json(
