@@ -6,8 +6,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import User from "@/models/User";
 
-// Background contract generation function
-async function generateContractInBackground(
+// Contract generation function
+async function generateContract(
   contractId: any, 
   userPrompt: string, 
   contractType: string, 
@@ -174,8 +174,8 @@ export async function POST(request: NextRequest) {
       unknowns: []
     };
 
-    // Save to database immediately with placeholder content
-    console.log('[CONTRACT-GENERATE] Creating contract record with placeholder content...');
+    // Save to database with generating status first
+    console.log('[CONTRACT-GENERATE] Creating contract record with generating status...');
     const contract = await Contract.create({
       userId: userId,
       title: placeholderContractJson.title,
@@ -190,11 +190,10 @@ export async function POST(request: NextRequest) {
 
     console.log('[CONTRACT-GENERATE] Contract record created with ID:', contract._id);
 
-    // Start contract generation in background (don't await)
-    generateContractInBackground(contract._id, userPrompt, contractType, isAnonymous, userName)
-      .catch(error => {
-        console.error('[CONTRACT-GENERATE] Background generation failed:', error);
-      });
+    // Generate contract synchronously (await it)
+    console.log('[CONTRACT-GENERATE] Starting synchronous contract generation...');
+    await generateContract(contract._id, userPrompt, contractType, isAnonymous, userName);
+    console.log('[CONTRACT-GENERATE] Contract generation completed');
 
     // Increment the user's contract count
     await User.findByIdAndUpdate(userId, {
