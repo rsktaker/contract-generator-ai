@@ -16,12 +16,19 @@ async function generateContractInBackground(
 ) {
   try {
     console.log('[CONTRACT-GENERATE-BG] Starting background generation for:', contractId);
+    console.log('[CONTRACT-GENERATE-BG] User prompt:', userPrompt);
+    console.log('[CONTRACT-GENERATE-BG] Contract type:', contractType);
+    
+    // Ensure database connection
+    await connectToDatabase();
     
     // Generate contract using writeContractTool
     if (!tools.writeContractTool || !tools.writeContractTool.execute) {
+      console.error('[CONTRACT-GENERATE-BG] writeContractTool is not available');
       throw new Error('writeContractTool is not available');
     }
     
+    console.log('[CONTRACT-GENERATE-BG] Calling writeContractTool...');
     const contractContent = await tools.writeContractTool.execute(
       {
         contractType,
@@ -32,6 +39,7 @@ async function generateContractInBackground(
         messages: []
       } // Provide an empty options object or appropriate options
     );
+    console.log('[CONTRACT-GENERATE-BG] writeContractTool completed');
     
     console.log('[CONTRACT-GENERATE-BG] Generated contract length:', contractContent?.length || 0);
     
@@ -63,14 +71,16 @@ async function generateContractInBackground(
     };
 
     // Update the contract in database with final content
-    await Contract.findByIdAndUpdate(contractId, {
+    console.log('[CONTRACT-GENERATE-BG] Updating contract in database...');
+    const updateResult = await Contract.findByIdAndUpdate(contractId, {
       title: finalContractJson.title,
       content: JSON.stringify(finalContractJson),
       parties: finalContractJson.parties,
       status: "draft" // Change from "generating" to "draft"
     });
-
+    
     console.log('[CONTRACT-GENERATE-BG] Contract updated with final content:', contractId);
+    console.log('[CONTRACT-GENERATE-BG] Update result:', updateResult ? 'success' : 'failed');
 
   } catch (error) {
     console.error('[CONTRACT-GENERATE-BG] Error in background generation:', error);
@@ -165,7 +175,7 @@ export async function POST(request: NextRequest) {
       requirements: prompt,
       content: JSON.stringify(placeholderContractJson),
       parties: placeholderContractJson.parties || [],
-      status: "draft", // Use draft status
+      status: "generating", // Use generating status initially
       isAnonymous: isAnonymous,
       generatedAt: new Date()
     });
