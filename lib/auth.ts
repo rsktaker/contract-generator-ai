@@ -225,8 +225,8 @@ export const authOptions: NextAuthOptions = {
     }
   },
 
-  // Set debug to false in production
-  debug: process.env.NODE_ENV === 'development',
+  // Enable debug logging for troubleshooting
+  debug: true,
 
   secret: process.env.NEXTAUTH_SECRET,
 }
