@@ -286,7 +286,7 @@ export default function HomePage() {
 
             <div className="text-center mt-6 md:mt-8">
               <Link
-                href="/contracts/new"
+                href="/"
                 className="inline-flex items-center px-4 md:px-6 py-2 md:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-800 active:bg-blue-700 transition-colors font-semibold text-sm md:text-base"
               >
                 Start Creating
@@ -310,7 +310,7 @@ export default function HomePage() {
               Join thousands of professionals who trust DreamSign for their contract needs
             </p>
             <Link
-              href="/contracts/new"
+              href="/"
               className="inline-block px-8 py-4 bg-white text-black rounded-md hover:bg-gray-100 transition-colors font-semibold text-lg"
             >
               Get Started Now

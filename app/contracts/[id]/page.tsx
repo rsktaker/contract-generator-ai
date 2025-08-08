@@ -116,6 +116,9 @@ export default function ContractPage() {
   // Load chat messages from database
   useEffect(() => {
     if (contractId) {
+      // Clear existing messages first to avoid showing old messages during load
+      setChatMessages([]);
+      setIsGeneratingInitialMessage(true);
       loadChatMessages();
     }
   }, [contractId]);
@@ -142,18 +145,6 @@ export default function ContractPage() {
     }
   };
 
-  const startNewChat = async () => {
-    try {
-      const response = await fetch(`/api/contracts/${contractId}/chat`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        await loadChatMessages();
-      }
-    } catch (error) {
-      console.error('Error starting new chat:', error);
-    }
-  };
 
   const processChatMessage = async (message: string) => {
     // Immediately add user message to chat
@@ -174,24 +165,26 @@ export default function ContractPage() {
     try {
       // First, analyze if this is a regeneration request using the updated API
       const regenerationAnalysisResponse = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `Analyze if this user message requires contract regeneration. Contract: ${JSON.stringify(contractJson, null, 2)}`
-            },
-            ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
-            {
-              role: 'user',
-              content: `Should I regenerate the contract for this request: "${message}"? Respond with JSON: {"shouldRegenerate": true/false, "reason": "explanation"}`
-            }
-          ]
-        }),
-      });
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: `Analyze if this user message requires contract regeneration. Contract: ${JSON.stringify(contractJson, null, 2)}`
+              },
+              ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
+              {
+                role: 'user',
+                content: `Should I regenerate the contract for this request: "${message}"? Respond with JSON: {"shouldRegenerate": true/false, "reason": "explanation"}`
+              }
+            ]
+          }),
+        });
+
+      let shouldRegenerate = false;
 
       if (regenerationAnalysisResponse.ok) {
         // Parse streaming response for regeneration analysis
@@ -214,7 +207,6 @@ export default function ContractPage() {
         console.log('Regeneration analysis content:', analysisContent);
         
         // Try to parse JSON response
-        let shouldRegenerate = false;
         try {
           const parsedResponse = JSON.parse(analysisContent);
           shouldRegenerate = parsedResponse.shouldRegenerate;
@@ -224,18 +216,19 @@ export default function ContractPage() {
                            analysisContent.toLowerCase().includes('modify') ||
                            analysisContent.toLowerCase().includes('change');
         }
-        
-        if (shouldRegenerate) {
-          console.log('Regeneration needed, calling handleRegenerateContract');
-          // Handle regeneration with dismissed unknowns if any
-          await handleRegenerateContract(message, dismissedUnknowns.length > 0 ? dismissedUnknowns : undefined);
-          // Clear dismissed unknowns after regeneration
-          setDismissedUnknowns([]);
-          return;
-        }
       } else {
         console.error('Regeneration analysis failed:', regenerationAnalysisResponse.status);
       }
+
+      if (shouldRegenerate) {
+        console.log('Regeneration needed, calling handleRegenerateContract');
+        // Handle regeneration with dismissed unknowns if any
+        await handleRegenerateContract(message, dismissedUnknowns.length > 0 ? dismissedUnknowns : undefined);
+        // Clear dismissed unknowns after regeneration
+        setDismissedUnknowns([]);
+        return;
+      }
+
 
       // Regular chat message using the updated API
       const response = await fetch('/api/chat', {
@@ -671,11 +664,8 @@ export default function ContractPage() {
               newMessage={newMessage}
               onNewMessageChange={setNewMessage}
               onSendMessage={processChatMessage}
-              onNewChat={startNewChat}
               contractText={contractJson?.blocks?.[0]?.text || ''}
-              onReplaceUnknowns={handleReplaceUnknowns}
               onRegenerateContract={handleRegenerateContract}
-              isReplacingUnknowns={isReplacingUnknowns}
               isRegenerating={isRegenerating}
             />
           </div>

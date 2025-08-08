@@ -1,3 +1,10 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
 /**
  * Detects if the user is in an embedded browser (WebView, in-app browser, etc.)
  * This is useful for redirecting users to the main site for OAuth flows

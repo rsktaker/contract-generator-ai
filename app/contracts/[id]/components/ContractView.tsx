@@ -41,6 +41,7 @@ export function ContractView({
       </div>
     );
   }
+
   
   // Debug logging
   console.log('ContractView - contractJson:', contractJson);

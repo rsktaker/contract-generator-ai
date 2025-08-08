@@ -18,10 +18,20 @@ async function generateContractInBackground(
     console.log('[CONTRACT-GENERATE-BG] Starting background generation for:', contractId);
     
     // Generate contract using writeContractTool
-    const contractContent = await tools.writeContractTool.execute({
-      contractType,
-      userPrompt
-    });
+    if (!tools.writeContractTool || !tools.writeContractTool.execute) {
+      throw new Error('writeContractTool is not available');
+    }
+    
+    const contractContent = await tools.writeContractTool.execute(
+      {
+        contractType,
+        userPrompt
+      },
+      {
+        toolCallId: "",
+        messages: []
+      } // Provide an empty options object or appropriate options
+    );
     
     console.log('[CONTRACT-GENERATE-BG] Generated contract length:', contractContent?.length || 0);
     
