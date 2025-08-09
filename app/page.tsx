@@ -31,9 +31,12 @@ export default function HomePage() {
       return
     }
 
+    console.log('[LANDING-PAGE] Generate button clicked, setting loading state...');
     setIsGenerating(true)
 
+    // Create contract first, then redirect immediately
     try {
+      console.log('[LANDING-PAGE] Making API call to /api/contracts/generate...');
       const response = await fetch("/api/contracts/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,19 +45,31 @@ export default function HomePage() {
         }),
       });
 
+      console.log('[LANDING-PAGE] API response received, status:', response.status);
+
       if (response.ok) {
         const { contract } = await response.json();
-        router.push(`/contracts/${contract._id}`);
+        console.log('[LANDING-PAGE] Contract created with ID:', contract._id);
+        
+        // Navigate immediately - don't wait for anything else
+        const encodedPrompt = encodeURIComponent(prompt.trim());
+        const redirectUrl = `/contracts/${contract._id}?prompt=${encodedPrompt}`;
+        console.log('[LANDING-PAGE] Redirecting to:', redirectUrl);
+        
+        router.push(redirectUrl);
+        return; // Exit immediately after navigation
       } else {
+        console.error('[LANDING-PAGE] API error response:', response.status);
         const errorData = await response.json();
         alert(errorData.message || "Failed to generate contract. Please try again.");
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("[LANDING-PAGE] Error in handleGenerateContract:", error);
       alert("An error occurred while generating the contract. Please try again.");
-    } finally {
-
     }
+    
+    console.log('[LANDING-PAGE] Resetting loading state...');
+    setIsGenerating(false);
   };
 
   return (
@@ -271,7 +286,7 @@ export default function HomePage() {
 
             <div className="text-center mt-6 md:mt-8">
               <Link
-                href="/contracts/new"
+                href="/"
                 className="inline-flex items-center px-4 md:px-6 py-2 md:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-800 active:bg-blue-700 transition-colors font-semibold text-sm md:text-base"
               >
                 Start Creating
@@ -295,7 +310,7 @@ export default function HomePage() {
               Join thousands of professionals who trust DreamSign for their contract needs
             </p>
             <Link
-              href="/contracts/new"
+              href="/"
               className="inline-block px-8 py-4 bg-white text-black rounded-md hover:bg-gray-100 transition-colors font-semibold text-lg"
             >
               Get Started Now

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { contractAgent } from '@/lib/agent';
+import { tools } from '@/lib/tools';
 
 interface Signature {
   party: string;
@@ -49,18 +49,34 @@ export async function POST(request: NextRequest) {
       blocksCount: contractJson.blocks.length
     });
     
-    const result = await contractAgent.generateContract(
-      `Regenerate block ${blockIndex} of this contract based on user instructions: ${userPrompt}
+    // Use writeContractTool directly
+    const prompt = `Regenerate block ${blockIndex} of this contract based on user instructions: ${userPrompt}
       
-Current contract: ${JSON.stringify(contractJson, null, 2)}`,
-      { isAnonymous: true }
+Current contract: ${JSON.stringify(contractJson, null, 2)}`;
+
+    const contractType = prompt.toLowerCase().includes('nda') ? 'nda' : 
+                        prompt.toLowerCase().includes('service') ? 'service' : 'custom';
+    
+    if (!tools.writeContractTool || !tools.writeContractTool.execute) {
+      throw new Error('writeContractTool is not available');
+    }
+
+    const regeneratedContent = await tools.writeContractTool.execute(
+      {
+        contractType,
+        userPrompt: prompt
+      },
+      {
+        toolCallId: '',
+        messages: []
+      } // Provide an empty options object or appropriate options
     );
 
     // Update the specific block with the new content
     const updatedContractJson = {
       ...contractJson,
       blocks: contractJson.blocks.map((block: any, index: number) =>
-        index === blockIndex ? { ...block, text: result.text } : block
+        index === blockIndex ? { ...block, text: regeneratedContent } : block
       )
     };
 

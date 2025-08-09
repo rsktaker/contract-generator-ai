@@ -27,7 +27,6 @@ export default function SignPage() {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [currentSignatureIndex, setCurrentSignatureIndex] = useState(0);
   const [signatures, setSignatures] = useState<SignatureData[]>([]);
-  const [isScrolling, setIsScrolling] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
@@ -38,22 +37,8 @@ export default function SignPage() {
     loadContract();
   }, [contractId]);
 
-  useEffect(() => {
-    if (contractJson && !isScrolling) {
-      // Auto-scroll to signature blocks
-      setIsScrolling(true);
-      setTimeout(() => {
-        const signatureSection = document.getElementById('signature-section');
-        if (signatureSection) {
-          signatureSection.scrollIntoView({ 
-            behavior: 'smooth',
-            block: 'center'
-          });
-        }
-        setIsScrolling(false);
-      }, 500);
-    }
-  }, [contractJson, isScrolling]);
+  // Removed auto-scroll to signature section as it was making the page unusable
+  // Users can manually scroll to signatures if needed
 
   useEffect(() => {
     if (contractJson) {
@@ -71,14 +56,23 @@ Best regards,
     try {
       const response = await fetch(`/api/contracts/${contractId}`);
       if (response.ok) {
-        const contractData = await response.json();
+        const data = await response.json();
+        const contractData = data.contract || data; // Handle different response formats
         setContract(contractData);
         
-        if (typeof contractData.content === 'string') {
-          setContractJson(JSON.parse(contractData.content));
+        console.log('Loaded contract data:', contractData);
+        
+        if (contractData.content) {
+          if (typeof contractData.content === 'string') {
+            setContractJson(JSON.parse(contractData.content));
+          } else {
+            setContractJson(contractData.content);
+          }
         } else {
-          setContractJson(contractData.content);
+          console.error('No content found in contract data:', contractData);
         }
+      } else {
+        console.error('Failed to load contract:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error loading contract:', error);
@@ -158,26 +152,19 @@ Best regards,
         {/* Left: Contract with Signature Blocks */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto p-8">
-            {/* Contract Header */}
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {contractJson.title || 'CONTRACT AGREEMENT'}
-              </h1>
-              <div className="text-sm text-gray-500">
-                Date: {new Date().toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </div>
-            </div>
 
             {/* Contract Text */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8">
               <div className="prose prose-lg max-w-none">
-                <div className="whitespace-pre-wrap text-gray-900 leading-relaxed">
-                  {contractText}
-                </div>
+                <div 
+                  className="whitespace-pre-wrap text-gray-900 leading-relaxed"
+                  style={{ fontFamily: 'Century Schoolbook, Times New Roman, serif' }}
+                  dangerouslySetInnerHTML={{
+                    __html: contractText
+                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\n/g, '<br>')
+                  }}
+                />
               </div>
             </div>
 

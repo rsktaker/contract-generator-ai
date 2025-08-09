@@ -2,14 +2,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Header from "@/components/Header";
 import { ContractView } from './components/ContractView';
 import { ChatInterface } from './components/ChatInterface';
 import { ErrorModal } from './components/ErrorModal';
-import { LoadingSpinner } from './components/LoadingSpinner';
-import { SkeletonLoaders } from './components/SkeletonLoaders';
+import { AnimatedLoading } from './components/AnimatedLoading';
 import { useContract } from './hooks/useContract';
 import { useMobileDetect } from './hooks/useMobileDetect';
 import { contractApi } from './utils/api';
@@ -23,10 +22,14 @@ interface ChatMessage {
 export default function ContractPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const contractId = params.id as string;
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';
   const isMobileView = useMobileDetect();
+  
+  // Get initial prompt from URL parameters
+  const initialPrompt = searchParams?.get('prompt') || null;
 
   // Contract management
   const {
@@ -39,6 +42,66 @@ export default function ContractPage() {
     setError,
     setContract
   } = useContract();
+
+  // Polling for contract updates when content is placeholder
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null;
+    
+    // Check if contract has placeholder content
+    const hasPlaceholderContent = contract && contractJson && (
+      contractJson.title === "Generating Contract..." ||
+      (contractJson.blocks && contractJson.blocks[0]?.text === "Contract is being generated...")
+    );
+    
+    if (hasPlaceholderContent) {
+      console.log('[CONTRACT-PAGE] Contract is generating, starting polling...');
+      
+      pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/contracts/${contractId}`);
+          if (response.ok) {
+            const data = await response.json();
+            const updatedContract = data.contract || data;
+            
+            // Parse content to check if it's still placeholder
+            let parsedContent = null;
+            if (updatedContract.content) {
+              parsedContent = typeof updatedContract.content === 'string' 
+                ? JSON.parse(updatedContract.content) 
+                : updatedContract.content;
+            }
+            
+            const stillPlaceholder = parsedContent && (
+              parsedContent.title === "Generating Contract..." ||
+              (parsedContent.blocks && parsedContent.blocks[0]?.text === "Contract is being generated...")
+            );
+            
+            console.log('[CONTRACT-PAGE] Polling update - still placeholder:', stillPlaceholder);
+            
+            if (!stillPlaceholder) {
+              console.log('[CONTRACT-PAGE] Contract ready, stopping polling');
+              setContract(updatedContract);
+              setContractJson(parsedContent);
+              
+              // Clear polling
+              if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[CONTRACT-PAGE] Polling error:', error);
+        }
+      }, 2000); // Poll every 2 seconds
+    }
+    
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [contract, contractJson, contractId, setContract, setContractJson]);
 
   // Chat management
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -53,9 +116,20 @@ export default function ContractPage() {
   // Load chat messages from database
   useEffect(() => {
     if (contractId) {
+      // Clear existing messages first to avoid showing old messages during load
+      setChatMessages([]);
+      setIsGeneratingInitialMessage(true);
       loadChatMessages();
     }
   }, [contractId]);
+
+  // Auto-send initial prompt if we have one and no existing chat messages
+  useEffect(() => {
+    if (initialPrompt && !isGeneratingInitialMessage && chatMessages.length === 0) {
+      console.log('[CONTRACT-PAGE] Auto-sending initial prompt:', initialPrompt);
+      processChatMessage(initialPrompt);
+    }
+  }, [initialPrompt, isGeneratingInitialMessage, chatMessages.length]);
 
   const loadChatMessages = async () => {
     try {
@@ -71,18 +145,6 @@ export default function ContractPage() {
     }
   };
 
-  const startNewChat = async () => {
-    try {
-      const response = await fetch(`/api/contracts/${contractId}/chat`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        await loadChatMessages();
-      }
-    } catch (error) {
-      console.error('Error starting new chat:', error);
-    }
-  };
 
   const processChatMessage = async (message: string) => {
     // Immediately add user message to chat
@@ -103,24 +165,26 @@ export default function ContractPage() {
     try {
       // First, analyze if this is a regeneration request using the updated API
       const regenerationAnalysisResponse = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `Analyze if this user message requires contract regeneration. Contract: ${JSON.stringify(contractJson, null, 2)}`
-            },
-            ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
-            {
-              role: 'user',
-              content: `Should I regenerate the contract for this request: "${message}"? Respond with JSON: {"shouldRegenerate": true/false, "reason": "explanation"}`
-            }
-          ]
-        }),
-      });
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: `Analyze if this user message requires contract regeneration. Contract: ${JSON.stringify(contractJson, null, 2)}`
+              },
+              ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
+              {
+                role: 'user',
+                content: `Should I regenerate the contract for this request: "${message}"? Respond with JSON: {"shouldRegenerate": true/false, "reason": "explanation"}`
+              }
+            ]
+          }),
+        });
+
+      let shouldRegenerate = false;
 
       if (regenerationAnalysisResponse.ok) {
         // Parse streaming response for regeneration analysis
@@ -143,7 +207,6 @@ export default function ContractPage() {
         console.log('Regeneration analysis content:', analysisContent);
         
         // Try to parse JSON response
-        let shouldRegenerate = false;
         try {
           const parsedResponse = JSON.parse(analysisContent);
           shouldRegenerate = parsedResponse.shouldRegenerate;
@@ -153,18 +216,19 @@ export default function ContractPage() {
                            analysisContent.toLowerCase().includes('modify') ||
                            analysisContent.toLowerCase().includes('change');
         }
-        
-        if (shouldRegenerate) {
-          console.log('Regeneration needed, calling handleRegenerateContract');
-          // Handle regeneration with dismissed unknowns if any
-          await handleRegenerateContract(message, dismissedUnknowns.length > 0 ? dismissedUnknowns : undefined);
-          // Clear dismissed unknowns after regeneration
-          setDismissedUnknowns([]);
-          return;
-        }
       } else {
         console.error('Regeneration analysis failed:', regenerationAnalysisResponse.status);
       }
+
+      if (shouldRegenerate) {
+        console.log('Regeneration needed, calling handleRegenerateContract');
+        // Handle regeneration with dismissed unknowns if any
+        await handleRegenerateContract(message, dismissedUnknowns.length > 0 ? dismissedUnknowns : undefined);
+        // Clear dismissed unknowns after regeneration
+        setDismissedUnknowns([]);
+        return;
+      }
+
 
       // Regular chat message using the updated API
       const response = await fetch('/api/chat', {
@@ -176,7 +240,7 @@ export default function ContractPage() {
           messages: [
             {
               role: 'system',
-              content: `You are a contract assistant helping with this contract: ${contractJson.title || 'Contract'}. Contract details: ${JSON.stringify(contractJson, null, 2)}`
+              content: `You are a contract assistant helping with this contract: ${contractJson?.title || contract?.title || 'Contract'}. Contract details: ${JSON.stringify(contractJson, null, 2)}`
             },
             ...chatMessages.map(msg => ({ role: msg.role, content: msg.content })),
             {
@@ -192,16 +256,80 @@ export default function ContractPage() {
         const text = await response.text();
         let responseContent = '';
         
-        // Extract content from streaming format
+        // Extract content from streaming format and check for tool calls
         const lines = text.split('\n').filter(line => line.startsWith('data: '));
+        let toolResults: any[] = [];
+        let toolCalls: any[] = [];
+        
+        console.log('[CHAT-PROCESS] Processing streaming response with', lines.length, 'lines');
+        
         for (const line of lines) {
           try {
             const data = JSON.parse(line.substring(6)); // Remove 'data: '
+            console.log('[CHAT-PROCESS] Line type:', data.type, data);
+            
             if (data.type === 'text-delta') {
               responseContent += data.delta;
+            } else if (data.type === 'tool-result') {
+              toolResults.push(data);
+              console.log('[CHAT-PROCESS] Tool result received:', JSON.stringify(data, null, 2));
+            } else if (data.type === 'tool-call') {
+              toolCalls.push(data);
+              console.log('[CHAT-PROCESS] Tool call detected:', JSON.stringify(data, null, 2));
             }
           } catch (e) {
-            // Skip invalid JSON lines
+            console.log('[CHAT-PROCESS] Failed to parse line:', line, e);
+          }
+        }
+        
+        console.log('[CHAT-PROCESS] Summary:');
+        console.log('- Response content length:', responseContent.length);
+        console.log('- Tool calls found:', toolCalls.length);
+        console.log('- Tool results found:', toolResults.length);
+        
+        // Check for writeContractTool results and update contract display
+        const contractToolResult = toolResults.find(result => 
+          result.toolName === 'writeContractTool' || 
+          (result.result && result.result.content)
+        );
+        
+        if (contractToolResult && contractToolResult.result) {
+          console.log('Found writeContractTool result, updating contract display');
+          const toolResult = contractToolResult.result;
+          
+          // Update the contract with the tool result
+          const updatedContractJson = {
+            ...contractJson,
+            title: toolResult.title || contractJson?.title || 'Generated Contract',
+            blocks: [
+              {
+                text: toolResult.content || toolResult.text || contractJson?.blocks?.[0]?.text || '',
+                signatures: contractJson?.blocks?.[0]?.signatures || []
+              }
+            ],
+            unknowns: contractJson?.unknowns || [] // Ensure unknowns is always an array
+          };
+          
+          console.log('Updating contract with tool result:', updatedContractJson);
+          if (updatedContractJson && setContractJson) {
+            setContractJson(updatedContractJson);
+            
+            // Save updated contract content to database so Sign page can access it
+            try {
+              await fetch(`/api/contracts/${contractId}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  content: updatedContractJson,
+                  title: updatedContractJson.title
+                }),
+              });
+              console.log('Saved updated contract content to database');
+            } catch (error) {
+              console.error('Error saving contract content to database:', error);
+            }
           }
         }
         
@@ -223,7 +351,7 @@ export default function ContractPage() {
           },
           body: JSON.stringify({
             message,
-            response: data.response
+            response: responseContent
           }),
         });
       }
@@ -304,6 +432,23 @@ export default function ContractPage() {
       console.log('Setting new contractJson:', updatedContractJson);
       setContractJson(updatedContractJson);
       
+      // Save updated contract content to database so Sign page can access it
+      try {
+        await fetch(`/api/contracts/${contractId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: updatedContractJson,
+            title: updatedContractJson.title
+          }),
+        });
+        console.log('Saved contract content with replaced unknowns to database');
+      } catch (error) {
+        console.error('Error saving contract content to database:', error);
+      }
+      
       // Store dismissed unknowns for potential regeneration
       if (dismissedUnknowns.length > 0) {
         setDismissedUnknowns(dismissedUnknowns);
@@ -380,6 +525,23 @@ export default function ContractPage() {
         console.log('Regeneration successful, updating contract');
         setContractJson(data.contractJson);
         
+        // Save updated contract content to database so Sign page can access it
+        try {
+          await fetch(`/api/contracts/${contractId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              content: data.contractJson,
+              title: data.contractJson.title
+            }),
+          });
+          console.log('Saved regenerated contract content to database');
+        } catch (error) {
+          console.error('Error saving regenerated contract content to database:', error);
+        }
+        
         // Generate completion message with unknowns check
         const completionResponse = await fetch('/api/chat', {
           method: 'POST',
@@ -451,12 +613,12 @@ export default function ContractPage() {
     }
   };
 
-  if (isLoading || !contractJson) {
+  if (isLoading) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <Header authenticated={isAuthenticated} />
         <div className="flex flex-col flex-1 bg-gray-50 overflow-hidden">
-          <SkeletonLoaders />
+          <AnimatedLoading />
         </div>
       </div>
     );
@@ -485,12 +647,7 @@ export default function ContractPage() {
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <ContractView
             contractJson={contractJson}
-            currentParty="PartyA"
-            onSignatureClick={() => {}}
-            onRegenerateBlock={handleRegenerateBlock}
-            onManualBlockEdit={handleManualBlockEdit}
             saveStatus={saveStatus}
-            onShowPreview={() => {}}
             onDownloadPDF={handleDownloadPDF}
             isDownloadingPDF={isDownloadingPDF}
           />
@@ -507,11 +664,8 @@ export default function ContractPage() {
               newMessage={newMessage}
               onNewMessageChange={setNewMessage}
               onSendMessage={processChatMessage}
-              onNewChat={startNewChat}
               contractText={contractJson?.blocks?.[0]?.text || ''}
-              onReplaceUnknowns={handleReplaceUnknowns}
               onRegenerateContract={handleRegenerateContract}
-              isReplacingUnknowns={isReplacingUnknowns}
               isRegenerating={isRegenerating}
             />
           </div>

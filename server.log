@@ -1,0 +1,190 @@
+
+> ai-contract-generator@0.1.0 dev
+> next dev -p 4001
+
+   ▲ Next.js 15.3.3
+   - Local:        http://localhost:4001
+   - Network:      http://192.168.68.61:4001
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1380ms
+ ✓ Compiled /middleware in 437ms (255 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 2.4s (894 modules)
+ GET / 200 in 2624ms
+ ✓ Compiled /contracts/[id] in 304ms (910 modules)
+ GET /contracts/6892c40f36b70ba4ccd656fe 200 in 768ms
+ GET / 200 in 78ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 710ms (1126 modules)
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ GET /api/auth/session 200 in 1677ms
+ ✓ Compiled /api/contracts/generate in 419ms (1264 modules)
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ POST /api/contracts/generate 201 in 36365ms
+ ✓ Compiled /contracts/[id] in 164ms (902 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 215ms
+ ✓ Compiled /api/contracts/[id]/chat in 449ms (1283 modules)
+Received contract ID: 6892cc9ebb2cbd30615ab7c2
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 940ms
+Received contract ID: 6892cc9ebb2cbd30615ab7c2
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 6ms
+Update request body: {
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update data: {
+  updatedAt: 2025-08-06T03:31:44.650Z,
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update result: {
+  acknowledged: true,
+  modifiedCount: 1,
+  upsertedId: null,
+  upsertedCount: 0,
+  matchedCount: 1
+}
+ PUT /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 17ms
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2/chat 200 in 27892ms
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2/chat 200 in 29491ms
+ ✓ Compiled in 533ms (390 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 75ms
+ ✓ Compiled /api/contracts/[id]/chat in 651ms (911 modules)
+ ✓ Compiled in 0ms (668 modules)
+Received contract ID: 6892cc9ebb2cbd30615ab7c2
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 664ms
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2/chat 200 in 709ms
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 514ms
+Update request body: {
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update data: {
+  updatedAt: 2025-08-06T03:40:25.928Z,
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update result: {
+  acknowledged: true,
+  modifiedCount: 1,
+  upsertedId: null,
+  upsertedCount: 0,
+  matchedCount: 1
+}
+ PUT /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 238ms
+ ✓ Compiled in 148ms (390 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 18ms
+ ✓ Compiled in 511ms (1058 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 50ms
+ ✓ Compiled in 343ms (911 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 130ms
+ ✓ Compiled in 209ms (390 modules)
+ ✓ Compiled /_not-found in 370ms (901 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 404 in 337ms
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 15ms
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 84ms
+ ✓ Compiled /api/contracts/[id] in 239ms (765 modules)
+ ✓ Compiled (906 modules)
+Received contract ID: 6892cc9ebb2cbd30615ab7c2
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 561ms
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ GET /api/auth/session 200 in 565ms
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2/chat 200 in 618ms
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 52ms
+Update request body: {
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update data: {
+  updatedAt: 2025-08-06T03:41:58.646Z,
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update result: {
+  acknowledged: true,
+  modifiedCount: 1,
+  upsertedId: null,
+  upsertedCount: 0,
+  matchedCount: 1
+}
+ PUT /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 125ms
+ ✓ Compiled in 193ms (393 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 15ms
+ ✓ Compiled in 106ms (393 modules)
+ ✓ Compiled in 87ms (393 modules)
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 190ms
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 21ms
+ GET /contracts/6892cc9ebb2cbd30615ab7c2 200 in 128ms
+ GET /api/auth/session 200 in 18ms
+Received contract ID: 6892cc9ebb2cbd30615ab7c2
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 31ms
+ GET /api/contracts/6892cc9ebb2cbd30615ab7c2/chat 200 in 35ms
+Update request body: {
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update data: {
+  updatedAt: 2025-08-06T03:43:37.444Z,
+  content: `{"title":"Here's the generated **Non-Disclosure Agreement (NDA)** with placeholders for information that needs to be filled in:","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"signatures":[]}]}`
+}
+Update result: {
+  acknowledged: true,
+  modifiedCount: 1,
+  upsertedId: null,
+  upsertedCount: 0,
+  matchedCount: 1
+}
+ PUT /api/contracts/6892cc9ebb2cbd30615ab7c2 200 in 7ms
+ GET / 200 in 18ms
+ ✓ Compiled /api/contracts/generate in 323ms (907 modules)
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ GET / 200 in 38ms
+ POST /api/contracts/generate 201 in 26331ms
+ GET /contracts/6892cf87bb2cbd30615ab7e7 200 in 41ms
+Received contract ID: 6892cf87bb2cbd30615ab7e7
+ GET /api/contracts/6892cf87bb2cbd30615ab7e7 200 in 13ms
+Received contract ID: 6892cf87bb2cbd30615ab7e7
+ GET /api/contracts/6892cf87bb2cbd30615ab7e7 200 in 6ms
+Update request body: {
+  content: '{"title":"NDA contract has been generated","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"text":"The NDA contract has been generated with placeholders for your name and other details.","signatures":[]}]}'
+}
+Update data: {
+  updatedAt: 2025-08-06T03:44:08.195Z,
+  content: '{"title":"NDA contract has been generated","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"text":"The NDA contract has been generated with placeholders for your name and other details.","signatures":[]}]}'
+}
+Update result: {
+  acknowledged: true,
+  modifiedCount: 1,
+  upsertedId: null,
+  upsertedCount: 0,
+  matchedCount: 1
+}
+ PUT /api/contracts/6892cf87bb2cbd30615ab7e7 200 in 33ms
+ GET /api/contracts/6892cf87bb2cbd30615ab7e7/chat 200 in 18318ms
+ GET /api/contracts/6892cf87bb2cbd30615ab7e7/chat 200 in 19ms
+ ✓ Compiled in 714ms (911 modules)
+ GET /contracts/6892cf87bb2cbd30615ab7e7 200 in 163ms
+ ✓ Compiled /api/contracts/[id]/chat in 110ms (541 modules)
+ ✓ Compiled (668 modules)
+Received contract ID: 6892cf87bb2cbd30615ab7e7
+ GET /api/contracts/6892cf87bb2cbd30615ab7e7 200 in 366ms
+ GET /api/contracts/6892cf87bb2cbd30615ab7e7/chat 200 in 386ms
+Update request body: {
+  content: '{"title":"NDA contract has been generated","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"text":"The NDA contract has been generated with placeholders for your name and other details.","signatures":[]}]}'
+}
+Update data: {
+  updatedAt: 2025-08-06T03:47:51.460Z,
+  content: '{"title":"NDA contract has been generated","type":"custom","parties":[{"name":"[Your Name]","role":"Party 1","signed":false,"signatureId":null},{"name":"[Other Party Name]","role":"Party 2","signed":false,"signatureId":null}],"blocks":[{"text":"The NDA contract has been generated with placeholders for your name and other details.","signatures":[]}]}'
+}
+Update result: {
+  acknowledged: true,
+  modifiedCount: 1,
+  upsertedId: null,
+  upsertedCount: 0,
+  matchedCount: 1
+}
+ PUT /api/contracts/6892cf87bb2cbd30615ab7e7 200 in 28ms
+ ✓ Compiled in 495ms (1057 modules)
+ GET /contracts/6892cf87bb2cbd30615ab7e7 200 in 42ms
+ ✓ Compiled in 386ms (1057 modules)
+ GET /contracts/6892cf87bb2cbd30615ab7e7 200 in 46ms
+[?25h

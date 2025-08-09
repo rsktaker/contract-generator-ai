@@ -1,10 +1,87 @@
 import { NextRequest, NextResponse } from "next/server";
-import { contractAgent } from "@/lib/agent";
+import { tools } from "@/lib/tools";
 import Contract from "@/models/Contract";
 import { connectToDatabase } from "@/lib/mongodb";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import User from "@/models/User";
+
+// Background contract generation function
+async function generateContractInBackground(
+  contractId: any, 
+  userPrompt: string, 
+  contractType: string, 
+  isAnonymous: boolean, 
+  userName: string
+) {
+  try {
+    console.log('[CONTRACT-GENERATE-BG] Starting background generation for:', contractId);
+    
+    // Generate contract using writeContractTool
+    if (!tools.writeContractTool || !tools.writeContractTool.execute) {
+      throw new Error('writeContractTool is not available');
+    }
+    
+    const contractContent = await tools.writeContractTool.execute(
+      {
+        contractType,
+        userPrompt
+      },
+      {
+        toolCallId: "",
+        messages: []
+      } // Provide an empty options object or appropriate options
+    );
+    
+    console.log('[CONTRACT-GENERATE-BG] Generated contract length:', contractContent?.length || 0);
+    
+    // Extract title from first line of generated contract
+    const firstLine = contractContent.split('\n')[0]?.replace(/^\**/, '') || 'Generated Contract';
+    const contractTitle = firstLine
+      .replace(/^Here.*?generated\s*/i, '')
+      .replace(/^Here.*?is\s*/i, '')
+      .replace(/^The\s+/i, '')
+      .replace(/\s+with.*$/i, '')
+      .replace(/\*\*/g, '')
+      .trim() || 'Generated Contract';
+
+    // Create final contract JSON structure
+    const finalContractJson = {
+      title: contractTitle,
+      type: contractType,
+      parties: [
+        { name: isAnonymous ? '[Your Name]' : userName, role: 'Party 1', signed: false, signatureId: null },
+        { name: '[Other Party Name]', role: 'Party 2', signed: false, signatureId: null }
+      ],
+      blocks: [
+        {
+          text: contractContent,
+          signatures: []
+        }
+      ],
+      unknowns: []
+    };
+
+    // Update the contract in database with final content
+    await Contract.findByIdAndUpdate(contractId, {
+      title: finalContractJson.title,
+      content: JSON.stringify(finalContractJson),
+      parties: finalContractJson.parties,
+      status: "draft" // Change from "generating" to "draft"
+    });
+
+    console.log('[CONTRACT-GENERATE-BG] Contract updated with final content:', contractId);
+
+  } catch (error) {
+    console.error('[CONTRACT-GENERATE-BG] Error in background generation:', error);
+    
+    // Update contract status to error
+    await Contract.findByIdAndUpdate(contractId, {
+      status: "error",
+      title: "Contract Generation Failed"
+    }).catch(err => console.error('[CONTRACT-GENERATE-BG] Failed to update error status:', err));
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,63 +130,53 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate contract using the new simplified approach
-    const currentDate = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    
     const isAnonymous = userName === "Anonymous User";
     const userPrompt = isAnonymous 
-      ? `Today is ${currentDate}. The user is anonymous. Please generate a contract where the user's name should be represented as a bracketed unknown like [Your Name] that can be filled in later. ${prompt}`
-      : `Today is ${currentDate}. This is the user's name: ${userName}. ${prompt}`;
+      ? `The user is anonymous. Use bracketed placeholders like [Your Name] for unknown information. ${prompt}`
+      : `User's name: ${userName}. ${prompt}`;
 
-    // Generate contract using the new contract agent
-    const result = await contractAgent.generateContract(userPrompt, {
-      isAnonymous,
-      userName
-    });
+    // Determine contract type from prompt
+    const contractType = userPrompt.toLowerCase().includes('nda') ? 'nda' : 
+                        userPrompt.toLowerCase().includes('service') ? 'service' : 'custom';
     
-    // Create contract data structure from the agent result
-    const contractData = {
-      title: result.text.split('\n')[0]?.replace(/^\**/, '') || 'Generated Contract',
-      content: result.text,
+    // Create placeholder contract JSON structure
+    const placeholderContractJson = {
+      title: "Generating Contract...",
+      type: contractType,
       parties: [
-        { name: isAnonymous ? '[Your Name]' : userName, role: 'Party 1' },
-        { name: '[Other Party Name]', role: 'Party 2' }
-      ]
-    };
-
-    // XXX: Define a new schema so the database can store the new contract data better.
-    const contractJson = {
-      title: contractData.title,
-      type: "custom",
-      parties: contractData.parties.map(party => ({
-        ...party,
-        signed: false,
-        signatureId: null
-      })),
+        { name: isAnonymous ? '[Your Name]' : userName, role: 'Party 1', signed: false, signatureId: null },
+        { name: '[Other Party Name]', role: 'Party 2', signed: false, signatureId: null }
+      ],
       blocks: [
         {
-          text: contractData.text,
+          text: "Contract is being generated...",
           signatures: []
         }
       ],
-      unknowns: contractData.unknowns
+      unknowns: []
     };
 
-    // Save to database with the user's ID (authenticated or anonymous)
+    // Save to database immediately with placeholder content
+    console.log('[CONTRACT-GENERATE] Creating contract record with placeholder content...');
     const contract = await Contract.create({
       userId: userId,
-      title: contractJson.title,
-      type: contractJson.type || "custom",
+      title: placeholderContractJson.title,
+      type: placeholderContractJson.type || "custom",
       requirements: prompt,
-      content: JSON.stringify(contractJson),
-      parties: contractJson.parties || [],
-      status: "draft",
+      content: JSON.stringify(placeholderContractJson),
+      parties: placeholderContractJson.parties || [],
+      status: "draft", // Use draft status
       isAnonymous: isAnonymous,
       generatedAt: new Date()
     });
+
+    console.log('[CONTRACT-GENERATE] Contract record created with ID:', contract._id);
+
+    // Start contract generation in background (don't await)
+    generateContractInBackground(contract._id, userPrompt, contractType, isAnonymous, userName)
+      .catch(error => {
+        console.error('[CONTRACT-GENERATE] Background generation failed:', error);
+      });
 
     // Increment the user's contract count
     await User.findByIdAndUpdate(userId, {

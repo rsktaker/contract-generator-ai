@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import Chat from '@/models/Chat';
 import Contract from '@/models/Contract';
-import { contractAgent } from '@/lib/agent';
 
 // GET - Load chat messages for a contract
 export async function GET(
@@ -27,28 +26,13 @@ export async function GET(
     let chat = await Chat.findOne({ contractId });
     
     if (!chat) {
-      // Generate initial AI message using the new contract agent
-      let initialContent = "Hello! I'm here to help you with your contract. Please let me know what you'd like to improve or add.";
-      
-      try {
-        const contractContent = JSON.parse(contract.content);
-        const result = await contractAgent.generateContract(
-          `Assess this contract and provide a helpful introduction. Contract: ${JSON.stringify(contractContent, null, 2)}`,
-          { isAnonymous: true }
-        );
-        initialContent = result.text;
-      } catch (error) {
-        console.error('Error generating initial message:', error);
-        // Use fallback message
-      }
-
-      // Create new chat with AI-generated initial message
+      // Create new chat with simple welcome message - no AI generation needed
       chat = await Chat.create({
         contractId,
         messages: [
           {
             role: 'assistant',
-            content: initialContent,
+            content: "Hello! I'm here to help you with your contract. Please let me know what you'd like to improve or add.",
             timestamp: new Date()
           }
         ]

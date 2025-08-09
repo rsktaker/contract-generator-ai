@@ -1,6 +1,7 @@
 export interface Contract {
   _id: string;
   content: string;
+  title?: string;
   recipientEmail?: string;
   parties?: any[];
   status?: string;

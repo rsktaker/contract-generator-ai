@@ -1,250 +1,146 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
 
-/**
- * Contract content generation tool - this will replace the old generateContractText function
- */
 export const writeContractTool = tool({
-  description: 'Generate comprehensive contract content based on user requirements',
-  inputSchema: z.object({
-    contractType: z.enum(['service', 'nda', 'employment', 'lease', 'custom']).describe('Type of contract to generate'),
-    userPrompt: z.string().describe('User description of what they need in the contract'),
-    parties: z.array(z.object({
-      name: z.string(),
-      role: z.string()
-    })).optional().describe('Contract parties if known'),
-    isAnonymous: z.boolean().default(false).describe('Whether user is anonymous (use [Your Name] placeholders)')
+  description: `Generate legally compliant business contracts with proper structure and formatting. 
+
+LEGAL COMPLIANCE: Follows comprehensive business legal document standards including essential structure requirements, mandatory legal elements, and professional formatting standards necessary for generating legally enforceable documents across US business jurisdictions.
+
+SUPPORTED CONTRACT TYPES & REQUIRED STRUCTURES:
+• NDAs (9 core sections): Header, Parties, Purpose, Confidential Information Definition, Exclusions, Receiving Party Obligations, Term/Duration, Remedies, General Provisions
+• Service Agreements (12 core sections): Header, Parties, Term, Services, Compensation, Independent Contractor Status, IP Rights, Confidentiality, Liability, Termination, General Provisions, Signatures  
+• Employment Contracts (15 core sections): Header, Parties, Position, Duties, Term, Compensation, Benefits, Work Schedule, Confidentiality, IP Rights, Post-Employment Restrictions, Termination, Dispute Resolution, General Provisions, Signatures
+
+MANDATORY LEGAL ELEMENTS:
+• Party Identification: Full legal names, addresses, business entity types
+• Specific Definitions: Clear boundaries for confidential information, services, deliverables
+• Standard Legal Protections: Exclusions clauses, liability limitations, governing law
+• Professional Language: Industry-standard legal terminology and phrasing
+• Risk Mitigation: Appropriate remedies, termination conditions, dispute resolution
+
+FORMATTING STANDARDS: Professional layout with 1.5" left margins, **bold section headings**, numbered sections, proper signature blocks, and variable field placeholders using [BRACKET] format for user completion. IMPORTANT: Make the first line/title center aligned.`,
+  inputSchema: z.object({ 
+    contractType: z.string().describe('Type of contract (nda, service, employment, partnership, licensing, custom, etc.)'),
+    userPrompt: z.string().describe('User description of contract needs and specific requirements')
   }),
-  execute: async ({ contractType, userPrompt, parties, isAnonymous }) => {
-    // This is a simplified version - in production, this would call an LLM
-    // For now, we'll generate a basic template based on contract type
+  execute: async ({ contractType, userPrompt }) => {
+    console.log(`[WRITE-CONTRACT-TOOL] Generating ${contractType} contract for: ${userPrompt}`);
     
-    let contractContent = '';
-    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    
-    // Generate basic contract structure based on type
-    switch (contractType) {
-      case 'service':
-        contractContent = generateServiceAgreement(userPrompt, parties, isAnonymous, date);
-        break;
-      case 'nda':
-        contractContent = generateNDAgreement(userPrompt, parties, isAnonymous, date);
-        break;
-      case 'employment':
-        contractContent = generateEmploymentContract(userPrompt, parties, isAnonymous, date);
-        break;
-      case 'lease':
-        contractContent = generateLeaseAgreement(userPrompt, parties, isAnonymous, date);
-        break;
-      default:
-        contractContent = generateCustomContract(userPrompt, parties, isAnonymous, date);
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    try {
+      // Generate the contract dynamically using AI
+      const result = await generateText({
+        model: openai('gpt-4o'),
+        system: `You are a professional contract generation expert with comprehensive knowledge of US business law and legal document standards.
+
+🏛️ LEGAL COMPLIANCE REQUIREMENTS:
+Generate contracts that meet federal and state legal standards with proper structure, mandatory elements, and professional formatting for enforceability across US business jurisdictions.
+
+📋 CONTRACT-SPECIFIC STRUCTURAL REQUIREMENTS:
+
+**Non-Disclosure Agreements (NDAs) - 9 Core Sections:**
+1. **Header**: "Non-Disclosure Agreement" or "Confidentiality Agreement"
+2. **Parties**: Full legal identification of Disclosing and Receiving Parties
+3. **Purpose**: Clear reason for information disclosure  
+4. **Confidential Information Definition**: Comprehensive definition with specific examples
+5. **Exclusions**: Standard legal exceptions (publicly known, independently developed, legally compelled)
+6. **Receiving Party Obligations**: Specific duties, restrictions, and confidentiality requirements
+7. **Term/Duration**: Definite time period or nature-based duration
+8. **Remedies**: Injunctive relief provisions due to irreparable harm potential
+9. **General Provisions**: Severability, integration clause, governing law selection
+
+**Service Agreements - 12 Core Sections:**
+1. **Header**: "Service Agreement" or "Professional Services Agreement"
+2. **Parties**: Service Provider and Client full identification
+3. **Term**: Duration, start/end dates, renewal options
+4. **Services**: Detailed scope of work with specific deliverables and acceptance criteria
+5. **Compensation**: Payment terms, rates, expense handling, collection procedures
+6. **Independent Contractor Status**: Clear classification to avoid employment law issues
+7. **Intellectual Property**: Work product ownership and licensing rights specification
+8. **Confidentiality**: Proprietary information protection clauses
+9. **Liability and Indemnification**: Risk allocation and limitation provisions
+10. **Termination**: Notice requirements, cause definitions, post-termination obligations
+11. **General Provisions**: Governing law, dispute resolution, integration
+12. **Signature Block**: Proper execution format with titles and dates
+
+**Employment Contracts - 15 Core Sections:**
+1. **Header**: "Employment Agreement"
+2. **Parties**: Employer and Employee full identification
+3. **Position**: Job title, department, reporting structure
+4. **Duties**: Detailed responsibilities and performance expectations
+5. **Term**: At-will status or fixed duration with state-compliant language
+6. **Compensation**: Base salary, bonus structure, overtime compliance
+7. **Benefits**: Health, retirement, vacation, sick leave entitlements
+8. **Work Schedule**: Hours, location, travel requirements
+9. **Confidentiality**: Proprietary information protection
+10. **Intellectual Property**: Work-related creation ownership rights
+11. **Post-Employment Restrictions**: Non-compete and non-solicitation (jurisdiction-compliant)
+12. **Termination**: Notice periods, cause definitions, severance terms
+13. **Dispute Resolution**: Arbitration or litigation procedures
+14. **General Provisions**: Integration, modification procedures, compliance references
+15. **Signature Block**: Employee and employer proper execution
+
+⚖️ MANDATORY LEGAL ELEMENTS (ALL CONTRACT TYPES):
+- **Party Identification**: Full legal names, business addresses, entity types
+- **Consideration**: Clear value exchange or benefit specification
+- **Legal Capacity**: Ensure parties have authority to enter agreements
+- **Standard Legal Language**: Industry-appropriate terminology and phrasing
+- **Governing Law**: Jurisdiction selection for dispute resolution
+- **Severability Clause**: Contract remains valid if portions are unenforceable
+- **Integration Clause**: This agreement supersedes all prior agreements
+
+📝 PROFESSIONAL FORMATTING STANDARDS:
+- **Document Layout**: Professional margins (1.5" left, 1" right, top, bottom)
+- **Typography**: Clear, readable font with **bold section headings**
+- **Structure**: Numbered sections (1., 2., 3.) with logical flow
+- **Signature Blocks**: Proper format with entity names, individual signatures, titles, dates
+- **Page Layout**: Professional appearance meeting business and court standards
+
+🔤 VARIABLE FIELD REQUIREMENTS:
+Use standardized [BRACKETED] placeholders for user completion:
+- Party Information: [Your Name], [Other Party Name], [Company Name], [Business Address]
+- Dates: [Effective Date], [Expiration Date], [Duration Period], [Termination Date]
+- Financial: [Amount], [Payment Terms], [Salary], [Bonus Structure], [Expense Limit]
+- Legal: [State/Jurisdiction], [Governing Law State], [Liability Cap Amount]
+- Specific: [Service Description], [Deliverables], [Job Title], [Department], [Confidential Information Categories]
+
+⚠️ RISK MITIGATION REQUIREMENTS:
+- Include appropriate liability limitations and damage remedies
+- Add standard exclusions for legally compelled disclosures
+- Ensure enforceability through reasonable scope and duration limits
+- Include proper termination and dispute resolution procedures
+- Reference applicable employment law compliance where required
+
+📊 OUTPUT REQUIREMENTS:
+- START IMMEDIATELY with contract title (no introductory text)
+- END with final contract provision (no explanatory text after)
+- Generate complete, ready-to-use legal document
+- Professional legal language throughout
+- All mandatory sections for contract type included
+- Proper legal structure and clause organization
+
+Current Date: ${currentDate}
+Contract Type: ${contractType}
+User Requirements: ${userPrompt}`,
+        prompt: `Generate a complete ${contractType} contract based on these requirements: ${userPrompt}
+
+The contract should be professional, legally sound, and include all necessary clauses for this type of agreement. Use bracketed placeholders for specific information that would need to be filled in.`,
+        temperature: 0.2,
+      });
+
+      console.log(`[WRITE-CONTRACT-TOOL] Generated contract length: ${result.text.length}`);
+      return result.text;
+
+    } catch (error) {
+      console.error('[WRITE-CONTRACT-TOOL] Error generating contract:', error);
+      throw error;
     }
-    
-    return {
-      success: true,
-      contractType,
-      content: contractContent,
-      wordCount: contractContent.split(' ').length,
-      generatedAt: new Date().toISOString(),
-      message: `Generated ${contractType} contract content`
-    };
   }
 });
-
-// Helper functions to generate different contract types
-function generateServiceAgreement(prompt: string, parties: any[] = [], isAnonymous: boolean, date: string): string {
-  const clientName = isAnonymous ? '[Client Name]' : (parties.find(p => p.role === 'client')?.name || '[Client Name]');
-  const providerName = isAnonymous ? '[Service Provider Name]' : (parties.find(p => p.role === 'provider')?.name || '[Service Provider Name]');
-  
-  return `**SERVICE AGREEMENT**
-
-This Service Agreement ("Agreement") is made effective as of ${date}, between ${clientName} ("Client") and ${providerName} ("Service Provider").
-
-**1. SERVICES**
-The Service Provider agrees to provide the following services: ${prompt}
-
-**2. PAYMENT TERMS**
-- Total compensation: [Amount]
-- Payment schedule: [Payment Schedule]
-- Late payment fee: [Late Fee]
-
-**3. PROJECT TIMELINE**
-- Start date: [Start Date]
-- Completion date: [Completion Date]
-- Milestones: [Project Milestones]
-
-**4. RESPONSIBILITIES**
-The Client agrees to:
-- Provide necessary materials and information
-- Make payments according to the agreed schedule
-- Provide timely feedback and approvals
-
-The Service Provider agrees to:
-- Deliver services according to specifications
-- Meet agreed-upon deadlines
-- Maintain professional standards
-
-**5. INTELLECTUAL PROPERTY**
-All work products created under this Agreement shall be owned by [IP Owner].
-
-**6. TERMINATION**
-Either party may terminate this Agreement with [Notice Period] written notice.
-
-**7. LIMITATION OF LIABILITY**
-Service Provider's liability shall not exceed the total amount paid under this Agreement.
-
-**8. GOVERNING LAW**
-This Agreement shall be governed by the laws of [Jurisdiction].`;
-}
-
-function generateNDAgreement(prompt: string, parties: any[] = [], isAnonymous: boolean, date: string): string {
-  const party1 = isAnonymous ? '[Party 1 Name]' : (parties[0]?.name || '[Party 1 Name]');
-  const party2 = isAnonymous ? '[Party 2 Name]' : (parties[1]?.name || '[Party 2 Name]');
-  
-  return `**NON-DISCLOSURE AGREEMENT**
-
-This Non-Disclosure Agreement ("Agreement") is made effective as of ${date}, between ${party1} ("Disclosing Party") and ${party2} ("Receiving Party").
-
-**1. PURPOSE**
-The purpose of this Agreement is to protect confidential information related to: ${prompt}
-
-**2. CONFIDENTIAL INFORMATION**
-Confidential Information includes but is not limited to:
-- Business plans and strategies
-- Financial information
-- Technical data and specifications
-- Customer lists and information
-- [Additional Confidential Information]
-
-**3. OBLIGATIONS OF RECEIVING PARTY**
-The Receiving Party agrees to:
-- Keep all Confidential Information strictly confidential
-- Not disclose Confidential Information to third parties
-- Use Confidential Information solely for the agreed purpose
-- Return or destroy Confidential Information upon request
-
-**4. EXCEPTIONS**
-This Agreement does not apply to information that:
-- Is publicly available
-- Was known to Receiving Party before disclosure
-- Is independently developed
-- Is required to be disclosed by law
-
-**5. TERM**
-This Agreement shall remain in effect for [Duration] years from the date of execution.
-
-**6. REMEDIES**
-Breach of this Agreement may result in irreparable harm, and the Disclosing Party shall be entitled to injunctive relief.
-
-**7. GOVERNING LAW**
-This Agreement shall be governed by the laws of [Jurisdiction].`;
-}
-
-function generateEmploymentContract(prompt: string, parties: any[] = [], isAnonymous: boolean, date: string): string {
-  const employer = isAnonymous ? '[Employer Name]' : (parties.find(p => p.role === 'employer')?.name || '[Employer Name]');
-  const employee = isAnonymous ? '[Employee Name]' : (parties.find(p => p.role === 'employee')?.name || '[Employee Name]');
-  
-  return `**EMPLOYMENT CONTRACT**
-
-This Employment Agreement ("Agreement") is made effective as of ${date}, between ${employer} ("Employer") and ${employee} ("Employee").
-
-**1. POSITION AND DUTIES**
-Employee is hired for the position of: ${prompt}
-
-**2. COMPENSATION**
-- Base salary: [Annual Salary]
-- Payment frequency: [Payment Schedule]
-- Benefits: [Benefits Package]
-
-**3. WORK SCHEDULE**
-- Hours: [Work Hours]
-- Days: [Work Days]
-- Location: [Work Location]
-
-**4. EMPLOYMENT TERM**
-This is [Employment Type] employment beginning on [Start Date].
-
-**5. CONFIDENTIALITY**
-Employee agrees to maintain confidentiality of all proprietary information.
-
-**6. NON-COMPETE**
-Employee agrees not to compete with Employer's business for [Non-Compete Period] after termination.
-
-**7. TERMINATION**
-Either party may terminate this Agreement with [Notice Period] written notice.
-
-**8. GOVERNING LAW**
-This Agreement shall be governed by the laws of [Jurisdiction].`;
-}
-
-function generateLeaseAgreement(prompt: string, parties: any[] = [], isAnonymous: boolean, date: string): string {
-  const landlord = isAnonymous ? '[Landlord Name]' : (parties.find(p => p.role === 'landlord')?.name || '[Landlord Name]');
-  const tenant = isAnonymous ? '[Tenant Name]' : (parties.find(p => p.role === 'tenant')?.name || '[Tenant Name]');
-  
-  return `**LEASE AGREEMENT**
-
-This Lease Agreement ("Agreement") is made effective as of ${date}, between ${landlord} ("Landlord") and ${tenant} ("Tenant").
-
-**1. PROPERTY**
-Property address: [Property Address]
-Description: ${prompt}
-
-**2. LEASE TERM**
-- Start date: [Lease Start Date]
-- End date: [Lease End Date]
-- Term length: [Lease Duration]
-
-**3. RENT**
-- Monthly rent: [Monthly Rent Amount]
-- Due date: [Rent Due Date]
-- Late fee: [Late Fee Amount]
-- Security deposit: [Security Deposit]
-
-**4. USE OF PROPERTY**
-The property shall be used solely for [Property Use].
-
-**5. UTILITIES**
-Tenant is responsible for: [Tenant Utilities]
-Landlord is responsible for: [Landlord Utilities]
-
-**6. MAINTENANCE**
-- Tenant responsibilities: [Tenant Maintenance]
-- Landlord responsibilities: [Landlord Maintenance]
-
-**7. TERMINATION**
-This lease may be terminated with [Notice Period] written notice.
-
-**8. GOVERNING LAW**
-This Agreement shall be governed by the laws of [Jurisdiction].`;
-}
-
-function generateCustomContract(prompt: string, parties: any[] = [], isAnonymous: boolean, date: string): string {
-  const party1 = isAnonymous ? '[Party 1 Name]' : (parties[0]?.name || '[Party 1 Name]');
-  const party2 = isAnonymous ? '[Party 2 Name]' : (parties[1]?.name || '[Party 2 Name]');
-  
-  return `**CONTRACT AGREEMENT**
-
-This Agreement is made effective as of ${date}, between ${party1} ("Party 1") and ${party2} ("Party 2").
-
-**1. PURPOSE**
-The purpose of this Agreement is: ${prompt}
-
-**2. TERMS AND CONDITIONS**
-[Specific Terms and Conditions]
-
-**3. OBLIGATIONS**
-Party 1 agrees to: [Party 1 Obligations]
-Party 2 agrees to: [Party 2 Obligations]
-
-**4. COMPENSATION**
-Payment terms: [Payment Terms]
-
-**5. DURATION**
-This Agreement shall be effective from [Start Date] to [End Date].
-
-**6. TERMINATION**
-This Agreement may be terminated: [Termination Conditions]
-
-**7. GOVERNING LAW**
-This Agreement shall be governed by the laws of [Jurisdiction].`;
-}

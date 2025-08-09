@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { contractAgent } from '@/lib/agent';
+import { tools } from '@/lib/tools';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,16 +24,31 @@ IMPORTANT: Remove these dismissed unknowns from the contract:
 ${dismissedUnknowns.map((unknown: string) => `- ${unknown}`).join('\n')}`;
     }
 
-    // Use the new contract agent
-    const result = await contractAgent.generateContract(prompt, { 
-      isAnonymous: true,
-      userName: 'Contract User'
-    });
+    // Use writeContractTool directly
+    console.log('[REGENERATE] Calling writeContractTool with prompt:', prompt);
+    
+    // Determine contract type
+    const contractType = prompt.toLowerCase().includes('nda') ? 'nda' : 
+                        prompt.toLowerCase().includes('service') ? 'service' : 'custom';
+    
+    if (!tools.writeContractTool || !tools.writeContractTool.execute) {
+      throw new Error('writeContractTool is not available');
+    }
+    
+    const generatedContract = await tools.writeContractTool.execute(
+      {
+        contractType,
+        userPrompt: prompt
+      },
+      {
+        toolCallId: '',
+        messages: []
+      } // Provide an empty options object or appropriate options
+    );
 
-    const regeneratedText = result.text;
-
-    // Remove [End of Document] if it appears
-    const cleanedText = regeneratedText.replace(/\[End of Document\]/gi, '').trim();
+    // Use the direct tool result
+    const cleanedText = generatedContract.replace(/\[End of Document\]/gi, '').trim();
+    console.log('[REGENERATE] Regenerated contract length:', cleanedText.length);
 
     // Update the contract with regenerated content
     const updatedContractJson = {

@@ -1,3 +1,10 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
 /**
  * Detects if the user is in an embedded browser (WebView, in-app browser, etc.)
  * This is useful for redirecting users to the main site for OAuth flows
@@ -214,4 +221,125 @@ export function forceRedirectToMainSiteWithGoogleAuth(callbackUrl?: string): voi
       window.location.href = finalUrl
     }
   }
+}
+
+// AI SDK Tool Processing Functions
+
+/**
+ * Processes tool invocations where human input is required, executing tools when authorized.
+ *
+ * @param options - The function options
+ * @param options.tools - Map of tool names to Tool instances that may expose execute functions
+ * @param options.writer - UIMessageStream writer for sending results back to the client
+ * @param options.messages - Array of messages to process
+ * @param executionFunctions - Map of tool names to execute functions
+ * @returns Promise resolving to the processed messages
+ */
+
+import {
+  convertToModelMessages,
+  Tool,
+  ToolCallOptions,
+  ToolSet,
+  UIMessageStreamWriter,
+  getToolName,
+  isToolUIPart,
+} from 'ai';
+import { HumanInTheLoopUIMessage } from './types';
+
+// Approval string to be shared across frontend and backend
+export const APPROVAL = {
+  YES: 'Yes, confirmed.',
+  NO: 'No, denied.',
+} as const;
+
+function isValidToolName<K extends PropertyKey, T extends object>(
+  key: K,
+  obj: T,
+): key is K & keyof T {
+  return key in obj;
+}
+
+export async function processToolCalls<
+  Tools extends ToolSet,
+  ExecutableTools extends {
+    [Tool in keyof Tools as Tools[Tool] extends { execute: Function }
+      ? never
+      : Tool]: Tools[Tool];
+  },
+>(
+  {
+    writer,
+    messages,
+  }: {
+    tools: Tools;
+    writer: UIMessageStreamWriter;
+    messages: HumanInTheLoopUIMessage[];
+  },
+  executeFunctions: {
+    [K in keyof Tools & keyof ExecutableTools]?: (
+      args: ExecutableTools[K] extends Tool<infer P> ? P : never,
+      context: ToolCallOptions,
+    ) => Promise<any>;
+  },
+): Promise<HumanInTheLoopUIMessage[]> {
+  const lastMessage = messages[messages.length - 1];
+  const parts = lastMessage.parts;
+  if (!parts) return messages;
+
+  const processedParts = await Promise.all(
+    parts.map(async part => {
+      if (!isToolUIPart(part)) return part;
+
+      const toolName = getToolName(part);
+
+      if (!(toolName in executeFunctions) || part.state !== 'output-available')
+        return part;
+
+      let result;
+
+      if (part.output === APPROVAL.YES) {
+        if (
+          !isValidToolName(toolName, executeFunctions) ||
+          part.state !== 'output-available'
+        ) {
+          return part;
+        }
+
+        const toolInstance = executeFunctions[toolName] as Tool['execute'];
+        if (toolInstance) {
+          result = await toolInstance(part.input, {
+            messages: convertToModelMessages(messages),
+            toolCallId: part.toolCallId,
+          });
+        } else {
+          result = 'Error: No execute function found on tool';
+        }
+      } else if (part.output === APPROVAL.NO) {
+        result = 'Error: User denied access to tool execution';
+      } else {
+        return part;
+      }
+
+      writer.write({
+        type: 'tool-output-available',
+        toolCallId: part.toolCallId,
+        output: result,
+      });
+
+      return {
+        ...part,
+        output: result,
+      };
+    }),
+  );
+
+  return [...messages.slice(0, -1), { ...lastMessage, parts: processedParts }];
+}
+
+export function getToolsRequiringConfirmation<T extends ToolSet>(tools: T): string[] {
+  return (Object.keys(tools) as (keyof T)[]).filter(key => {
+    const maybeTool = tools[key];
+    return typeof maybeTool.execute !== 'function';
+  }) as string[];
 }
