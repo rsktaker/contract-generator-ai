@@ -34,7 +34,6 @@ export default function HomePage() {
     console.log('[LANDING-PAGE] Generate button clicked, setting loading state...');
     setIsGenerating(true)
 
-    // Create contract first, then redirect immediately
     try {
       console.log('[LANDING-PAGE] Making API call to /api/contracts/generate...');
       const response = await fetch("/api/contracts/generate", {
@@ -51,7 +50,7 @@ export default function HomePage() {
         const { contract } = await response.json();
         console.log('[LANDING-PAGE] Contract created with ID:', contract._id);
         
-        // Navigate immediately - don't wait for anything else
+        // Navigate immediately after getting contract ID (generation happens on the contract page)
         const encodedPrompt = encodeURIComponent(prompt.trim());
         const redirectUrl = `/contracts/${contract._id}?prompt=${encodedPrompt}`;
         console.log('[LANDING-PAGE] Redirecting to:', redirectUrl);

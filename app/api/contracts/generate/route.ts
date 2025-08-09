@@ -190,10 +190,15 @@ export async function POST(request: NextRequest) {
 
     console.log('[CONTRACT-GENERATE] Contract record created with ID:', contract._id);
 
-    // Generate contract synchronously (await it)
-    console.log('[CONTRACT-GENERATE] Starting synchronous contract generation...');
-    await generateContract(contract._id, userPrompt, contractType, isAnonymous, userName);
-    console.log('[CONTRACT-GENERATE] Contract generation completed');
+    // Generate contract in background (don't await - let it run async)  
+    console.log('[CONTRACT-GENERATE] Starting background contract generation...');
+    generateContract(contract._id, userPrompt, contractType, isAnonymous, userName)
+      .then(() => {
+        console.log('[CONTRACT-GENERATE] Background generation completed successfully');
+      })
+      .catch(error => {
+        console.error('[CONTRACT-GENERATE] Background generation failed:', error);
+      });
 
     // Increment the user's contract count
     await User.findByIdAndUpdate(userId, {
