@@ -34,10 +34,10 @@ export default function HomePage() {
     console.log('[LANDING-PAGE] Generate button clicked, setting loading state...');
     setIsGenerating(true)
 
-    // Create contract first, then redirect immediately
     try {
-      console.log('[LANDING-PAGE] Making API call to /api/contracts/generate...');
-      const response = await fetch("/api/contracts/generate", {
+      // Step 1: Create contract record quickly (no generation yet)
+      console.log('[LANDING-PAGE] Creating contract record...');
+      const createResponse = await fetch("/api/contracts/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -45,27 +45,37 @@ export default function HomePage() {
         }),
       });
 
-      console.log('[LANDING-PAGE] API response received, status:', response.status);
-
-      if (response.ok) {
-        const { contract } = await response.json();
+      if (createResponse.ok) {
+        const { contract } = await createResponse.json();
         console.log('[LANDING-PAGE] Contract created with ID:', contract._id);
         
-        // Navigate immediately - don't wait for anything else
+        // Step 2: Redirect immediately to contract page with loading state
         const encodedPrompt = encodeURIComponent(prompt.trim());
         const redirectUrl = `/contracts/${contract._id}?prompt=${encodedPrompt}`;
         console.log('[LANDING-PAGE] Redirecting to:', redirectUrl);
         
+        // Step 3: Start generation in background (don't wait for it)
+        fetch("/api/contracts/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contractId: contract._id,
+            prompt: prompt.trim(),
+          }),
+        }).catch(error => {
+          console.error('[LANDING-PAGE] Background generation failed:', error);
+        });
+
         router.push(redirectUrl);
         return; // Exit immediately after navigation
       } else {
-        console.error('[LANDING-PAGE] API error response:', response.status);
-        const errorData = await response.json();
-        alert(errorData.message || "Failed to generate contract. Please try again.");
+        console.error('[LANDING-PAGE] API error response:', createResponse.status);
+        const errorData = await createResponse.json();
+        alert(errorData.message || "Failed to create contract. Please try again.");
       }
     } catch (error) {
       console.error("[LANDING-PAGE] Error in handleGenerateContract:", error);
-      alert("An error occurred while generating the contract. Please try again.");
+      alert("An error occurred while creating the contract. Please try again.");
     }
     
     console.log('[LANDING-PAGE] Resetting loading state...');
