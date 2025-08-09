@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",
-    "@ai-sdk/openai": "^2.0.2",
+    "@ai-sdk/openai": "^2.0.3",
     "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "^2.2.4",
     "@lexical/html": "^0.33.1",
