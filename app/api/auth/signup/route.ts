@@ -36,8 +36,40 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ email: email.toLowerCase() }).select('+password');
     if (existingUser) {
+      console.log('[SIGNUP] User already exists:', {
+        email: existingUser.email,
+        hasPassword: !!existingUser.password,
+        hasGoogleId: !!existingUser.googleId,
+        createdAt: existingUser.createdAt,
+        name: existingUser.name
+      });
+      
+      // If user exists but only has Google OAuth (no password), allow adding password
+      if (existingUser.googleId && !existingUser.password) {
+        console.log('[SIGNUP] Existing Google user adding password');
+        existingUser.password = password; // This will trigger the pre-save hook to hash it
+        existingUser.name = name; // Update name if provided
+        await existingUser.save();
+        
+        const userResponse = {
+          id: existingUser._id.toString(),
+          name: existingUser.name,
+          email: existingUser.email,
+          role: existingUser.role || 'user',
+          plan: existingUser.plan || 'free'
+        };
+        
+        return NextResponse.json(
+          { 
+            message: "Password added to existing Google account", 
+            user: userResponse 
+          },
+          { status: 200 }
+        );
+      }
+      
       return NextResponse.json(
         { error: "User already exists" },
         { status: 409 }
