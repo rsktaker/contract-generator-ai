@@ -9,6 +9,7 @@ import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getRoot, $getSelection, $createParagraphNode, $createTextNode, EditorState, $isRangeSelection } from 'lexical';
 import { SaveStatusIndicator } from './SaveStatusIndicator';
+import { AnimatedLoading } from './AnimatedLoading';
 
 interface ContractEditorProps {
   contractJson: any;
@@ -16,6 +17,7 @@ interface ContractEditorProps {
   onSignatureClick: (blockIndex: number, signatureIndex: number) => void;
   onRegenerateBlock: (blockIndex: number, userInstructions: string) => void;
   onManualBlockEdit: (blockIndex: number, updatedBlock: any) => void;
+  onManualTitleEdit: (newTitle: string) => void;
   saveStatus: 'saved' | 'saving' | 'error';
   onShowPreview: () => void;
   onDownloadPDF: () => void;
@@ -76,6 +78,15 @@ function SaveOnChangePlugin({ onSave }: { onSave: (content: string) => void }) {
     });
   }, [editor, onSave]);
 
+  return null;
+}
+
+// Force editable state plugin
+function EditablePlugin({ editable = true }: { editable?: boolean }) {
+  const [editor] = useLexicalComposerContext();
+  useEffect(() => {
+    editor.setEditable(editable);
+  }, [editor, editable]);
   return null;
 }
 
@@ -142,11 +153,17 @@ export function ContractEditor({
   onSignatureClick,
   onRegenerateBlock,
   onManualBlockEdit,
+  onManualTitleEdit,
   saveStatus,
   onShowPreview,
   onDownloadPDF,
   isDownloadingPDF
 }: ContractEditorProps) {
+  // Placeholder detection for generating state
+  const isPlaceholderContent = !!(contractJson && (
+    contractJson.title === 'Generating Contract...' ||
+    (contractJson.blocks && contractJson.blocks[0]?.text === 'Contract is being generated...')
+  ));
   // Convert contract blocks to Lexical editor state
   const getInitialEditorState = () => {
     if (!contractJson || !contractJson.blocks || contractJson.blocks.length === 0) {
@@ -220,6 +237,68 @@ export function ContractEditor({
     });
   };
 
+  // Title editor: initial state
+  const getInitialTitleEditorState = () => {
+    const titleText = contractJson?.title || 'Untitled Contract';
+    return JSON.stringify({
+      root: {
+        children: [
+          {
+            children: [
+              {
+                detail: 0,
+                format: 0,
+                mode: 'normal',
+                style: '',
+                text: titleText,
+                type: 'text',
+                version: 1,
+              },
+            ],
+            direction: 'ltr',
+            format: '',
+            indent: 0,
+            type: 'paragraph',
+            version: 1,
+          },
+        ],
+        direction: 'ltr',
+        format: '',
+        indent: 0,
+        type: 'root',
+        version: 1,
+      },
+    });
+  };
+
+  const extractPlainTextFromLexical = (lexicalState: any): string => {
+    let result = '';
+    const traverse = (node: any) => {
+      if (node.type === 'text' && typeof node.text === 'string') {
+        result += node.text;
+      }
+      if (Array.isArray(node.children)) {
+        node.children.forEach(traverse);
+      }
+    };
+    if (lexicalState?.root) {
+      traverse(lexicalState.root);
+    }
+    return result.trim();
+  };
+
+  const handleTitleSave = (content: string) => {
+    try {
+      const lexicalState = JSON.parse(content);
+      const plain = extractPlainTextFromLexical(lexicalState);
+      if (plain !== (contractJson?.title || '')) {
+        onManualTitleEdit(plain);
+      }
+    } catch (e) {
+      console.error('Error parsing title editor content:', e);
+    }
+  };
+
   const handleSave = (content: string) => {
     // Convert Lexical content back to contract format
     try {
@@ -286,43 +365,82 @@ export function ContractEditor({
     editorState: getInitialEditorState(),
   };
 
-  if (!contractJson || !contractJson.blocks || contractJson.blocks.length === 0) {
+  // Show loading spinner for the entire editor while generating or if content missing
+  if (
+    !contractJson ||
+    !contractJson.blocks ||
+    contractJson.blocks.length === 0 ||
+    isPlaceholderContent
+  ) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">No contract content available</div>
+      <div className="h-full flex flex-col overflow-hidden">
+        <AnimatedLoading />
       </div>
     );
   }
 
   return (
     <div className="h-full flex flex-col overflow-hidden mt-1">
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto p-8 py-4 m-3 mb-0 pt-6 ml-5 min-h-0 max-h-full">
+      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto p-8 py-4 m-3 mb-4 pt-6 ml-5 min-h-0 max-h-full">
         <div className="p-8 pt-0.5 max-w-4xl mx-auto w-full">
           <div className="flex-1 flex ml-5 mb-4">
             <SaveStatusIndicator status={saveStatus} />
           </div>
-          {/* Contract Header */}
-          <div className="text-center mb-2 flex-shrink-0">
+          {/* Contract Header - Editable Title (Lexical) */}
+          <div className="text-center mb-4 flex-shrink-0 relative z-50 pointer-events-auto">
             <div className="flex items-center justify-center">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Century Schoolbook, Times New Roman, serif' }}>
-                {contractJson.title || 'CONTRACT AGREEMENT'}
-              </h1>
+              <div className="relative w-full z-50 pointer-events-auto">
+                <LexicalComposer
+                  initialConfig={{
+                    namespace: 'ContractTitleEditor',
+                    theme: {
+                      paragraph: 'mb-0',
+                    },
+                    onError: (error: Error) => console.error('Lexical title error:', error),
+                    editorState: getInitialTitleEditorState(),
+                  }}
+                >
+                  <div className="relative z-50 pointer-events-auto">
+                    <EditablePlugin editable={true} />
+                    <RichTextPlugin
+                      contentEditable={
+                        <ContentEditable
+                          className="outline-none text-4xl font-bold text-gray-900 mb-2 text-center min-h-[48px] pointer-events-auto relative z-50 block w-full cursor-text"
+                          style={{ fontFamily: 'Century Schoolbook, Times New Roman, serif' }}
+                          role="textbox"
+                          tabIndex={0}
+                          aria-label="Contract title"
+                        />
+                      }
+                      placeholder={
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 text-gray-400 pointer-events-none z-40">
+                          Untitled Contract
+                        </div>
+                      }
+                      ErrorBoundary={ErrorBoundary}
+                    />
+                    <HistoryPlugin />
+                    <SaveOnChangePlugin onSave={handleTitleSave} />
+                  </div>
+                </LexicalComposer>
+              </div>
             </div>
             <div className="text-sm text-gray-500">
               Date: {new Date().toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
-                day: 'numeric'
+                day: 'numeric',
               })}
             </div>
           </div>
           
           {/* Lexical Editor */}
-          <div className="prose prose-lg max-w-none">
+          <div className="prose prose-lg max-w-none mt-4 relative z-10">
             <LexicalComposer initialConfig={initialConfig} key={JSON.stringify(contractJson)}>
               <div className="relative">
                 <Toolbar />
                 <div className="relative">
+                  <EditablePlugin editable={true} />
                   <RichTextPlugin
                     contentEditable={
                       <ContentEditable 

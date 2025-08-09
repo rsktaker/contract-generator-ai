@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Header from "@/components/Header";
-import { ContractView } from './components/ContractView';
+import { ContractEditor } from './components/ContractEditor';
 import { ChatInterface } from './components/ChatInterface';
 import { ErrorModal } from './components/ErrorModal';
 import { AnimatedLoading } from './components/AnimatedLoading';
@@ -643,14 +643,26 @@ export default function ContractPage() {
       <Header authenticated={isAuthenticated} />
       
       <div className="flex flex-1 bg-gray-50 overflow-hidden">
-        {/* Left: Contract View */}
+        {/* Left: Contract Editor */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <ContractView
-            contractJson={contractJson}
-            saveStatus={saveStatus}
-            onDownloadPDF={handleDownloadPDF}
-            isDownloadingPDF={isDownloadingPDF}
-          />
+          {contractJson && (
+            <ContractEditor
+              contractJson={contractJson}
+              currentParty={"User"}
+              onSignatureClick={() => {}}
+              onRegenerateBlock={handleRegenerateBlock}
+              onManualBlockEdit={handleManualBlockEdit}
+              onManualTitleEdit={(newTitle: string) => {
+                if (!contractJson) return;
+                const updated = { ...contractJson, title: newTitle } as any;
+                setContractJson(updated);
+              }}
+              saveStatus={saveStatus}
+              onShowPreview={() => {}}
+              onDownloadPDF={handleDownloadPDF}
+              isDownloadingPDF={isDownloadingPDF}
+            />
+          )}
         </div>
 
         {/* Right: Chat + Send Panel */}
