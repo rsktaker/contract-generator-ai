@@ -477,10 +477,10 @@ export function ContractEditor({
 
           {/* Signature placeholders (below contract) */}
           {showSignaturesSection && (
-            <div id="signature-section" className="mt-4 space-y-6 ml-5 flex flex-col">
+            <div id="signature-section" className="mt-1 space-y-6 ml-5 flex flex-col">
               {/* Your Signature */}
               <div
-                className="relative inline-block bg-blue-50 rounded-lg p-4 font-mono cursor-pointer hover:bg-blue-100 transition-colors mr-30"
+                className="relative inline-block bg-blue-50 rounded-lg w-1/2 p-4 font-mono cursor-pointer hover:bg-blue-100 transition-colors mr-30"
                 onClick={(e) => {
                   e.stopPropagation();
                   onSignatureClick(0, 0);
@@ -495,7 +495,7 @@ export function ContractEditor({
                   )}
                   </div>
                   <div className="text-md">Signature: {signaturesData[0]?.img_url ? (
-                    <img src={signaturesData[0]?.img_url} alt="Your signature" className="inline-block h-12 max-w-64 object-contain bg-white border border-gray-200 rounded p-2" />
+                    <img src={signaturesData[0]?.img_url} alt="Your signature" className="inline-block h-12 max-w-64 object-contain rounded p-0" />
                   ) : (
                     <span className="text-gray-400">_______________</span>
                   )}
@@ -510,7 +510,7 @@ export function ContractEditor({
               </div>
               {/* Counterparty Signature */}
               <div
-                className="relative inline-block bg-red-50 rounded-lg p-4 font-mono cursor-not-allowed"
+                className="relative inline-block bg-red-50 w-1/2 rounded-lg p-4 font-mono cursor-not-allowed"
                 onClick={(e) => {
                   e.stopPropagation();
                   onSignatureClick(0, 1);
@@ -524,7 +524,7 @@ export function ContractEditor({
                     <span className="text-gray-400">_______________</span>
                   )}</div>
                   <div className="text-md">Signature: {signaturesData[1]?.img_url ? (
-                    <img src={signaturesData[1]?.img_url} alt="Counterparty signature" className="inline-block h-12 max-w-64 object-contain bg-white border border-gray-200 rounded p-2" />
+                    <img src={signaturesData[1]?.img_url} alt="Counterparty signature" className="inline-block h-12 max-w-64 object-contain rounded p-0" />
                   ) : (
                     <span className="text-gray-400">_______________</span>
                   )}</div>

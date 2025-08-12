@@ -35,7 +35,7 @@ export default function SignatureModal({ onClose, onSave }) {
       }
       
       try {
-        // Get the signature canvas
+        // Get only the signature canvas (transparent background)
         let canvas;
         if (typeof sigCanvasRef.current.getTrimmedCanvas === 'function') {
           canvas = sigCanvasRef.current.getTrimmedCanvas();
@@ -43,50 +43,16 @@ export default function SignatureModal({ onClose, onSave }) {
           canvas = sigCanvasRef.current.getCanvas();
         }
 
-        // Create a new canvas to add the name, date and contract ID
-        const newCanvas = document.createElement('canvas');
-        const ctx = newCanvas.getContext('2d');
-        
-        // Get current date
         const currentDate = new Date().toLocaleDateString('en-US', { 
           year: 'numeric', 
           month: 'long', 
           day: 'numeric' 
         });
-        
-        // Set canvas size to accommodate all elements
-        const padding = 20;
-        const nameWidth = 200;
-        const dateWidth = 200;
-        const contractIdWidth = 150;
-        newCanvas.width = Math.max(canvas.width, nameWidth + dateWidth + contractIdWidth + padding * 2);
-        newCanvas.height = canvas.height + 100; // Extra height for name and date
-        
-        // Keep background transparent
-        ctx.clearRect(0, 0, newCanvas.width, newCanvas.height);
-        
-        // Draw the signature
-        ctx.drawImage(canvas, 0, 40); // Move signature down to make room for name
-        
-        // Add the name above the signature
-        ctx.fillStyle = '#374151';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`Name: ${name}`, padding, 20);
-        
-        // Add the date to the right of the signature
-        ctx.fillText(`Date: ${currentDate}`, padding, newCanvas.height - 30);
-        
-        // Add contract ID at the bottom
-        ctx.font = '12px Arial';
-        ctx.fillStyle = '#6b7280';
-        ctx.fillText(`Contract ID: ${params.id}`, padding, newCanvas.height - 10);
-        
-        // Convert to data URL with PNG format to preserve transparency
-        const dataUrl = newCanvas.toDataURL('image/png');
-        
-        // Pass both the signature image and the name
+
+        // Export only the signature strokes as PNG (keeps transparency)
+        const dataUrl = canvas.toDataURL('image/png');
+
+        // Pass signature image plus separate metadata
         onSave({
           img_url: dataUrl,
           name: name,

@@ -115,12 +115,38 @@ export default function ContractPage() {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [currentSignatureIndex, setCurrentSignatureIndex] = useState<number | null>(null);
   const [signaturesData, setSignaturesData] = useState<Array<{ img_url: string; name: string; date: string } | null>>([null, null]);
+  const [isNavigatingToSend, setIsNavigatingToSend] = useState(false);
   const [isReplacingUnknowns, setIsReplacingUnknowns] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [dismissedUnknowns, setDismissedUnknowns] = useState<string[]>([]);
 
+  // Hydrate local signature UI state from contract when available
+  useEffect(() => {
+    const sigs = contractJson?.blocks?.[0]?.signatures as Array<{ img_url: string; name?: string; date?: string; index: number }> | undefined;
+    if (!sigs) return;
+    const mapped: Array<{ img_url: string; name: string; date: string } | null> = [null, null];
+    sigs.forEach((sig) => {
+      if (sig && typeof sig.index === 'number' && (sig.index === 0 || sig.index === 1)) {
+        mapped[sig.index] = {
+          img_url: sig.img_url,
+          name: sig.name || '',
+          date: sig.date || ''
+        };
+      }
+    });
+    setSignaturesData(mapped);
+  }, [contractJson]);
+
   // Load chat messages from database
   useEffect(() => {
+    try {
+      const storedFlow = localStorage.getItem(`contract-flow-${contractId}`);
+      if (storedFlow) {
+        const parsed = JSON.parse(storedFlow);
+        if (parsed.showSignaturesSection) setShowSignaturesSection(true);
+        if (parsed.ctaMode === 'send') setCtaMode('send');
+      }
+    } catch {}
     if (contractId) {
       // Clear existing messages first to avoid showing old messages during load
       setChatMessages([]);
@@ -629,6 +655,9 @@ export default function ContractPage() {
     };
     setContractJson(updated);
     setShowSignaturesSection(true);
+    try {
+      localStorage.setItem(`contract-flow-${contractId}`, JSON.stringify({ showSignaturesSection: true, ctaMode: 'send' }));
+    } catch {}
   };
 
   if (isLoading) {
@@ -667,7 +696,6 @@ export default function ContractPage() {
             <ContractEditor
               contractJson={contractJson}
               currentParty={"User"}
-              onSignatureClick={() => {}}
               onSignatureClick={(blockIndex: number, signatureIndex: number) => {
                 setCurrentSignatureIndex(signatureIndex);
                 setShowSignatureModal(true);
@@ -712,23 +740,40 @@ export default function ContractPage() {
               <button
                 onClick={() => {
                   appendWitnessAndSignatures();
-                  setTimeout(() => setCtaMode('send'), 500);
+                  setTimeout(() => {
+                    setCtaMode('send');
+                  }, 500);
                 }}
-                className="w-full py-4 text-white rounded-lg transition-all duration-300 bg-black flex items-center justify-center text-lg font-medium"
+                className="w-full py-4 text-white rounded-lg transition-all duration-300 bg-black flex items-center justify-center text-lg font-medium hover:scale-105 hover:shadow-2xl"
               >
                 Sign →
               </button>
             ) : (
               <div className="w-full">
-                <div className="w-full mb-2 text-center text-sm text-gray-500">Ready to send</div>
-                <button
-                  onClick={() => {
-                    router.push(`/contracts/${contractId}/sign`);
-                  }}
-                  className="w-full py-4 text-white rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg bg-green-600 hover:bg-green-700 flex items-center justify-center text-lg font-semibold"
-                >
-                  Send →
-                </button>
+                <div className="relative">
+                  <span className="pointer-events-none absolute -inset-[0.5px] rounded-lg rainbow-glow opacity-90"></span>
+                  <button
+                    onClick={() => {
+                      if (isNavigatingToSend) return;
+                      setIsNavigatingToSend(true);
+                      router.push(`/contracts/${contractId}/send`);
+                    }}
+                    disabled={isNavigatingToSend}
+                    className={`relative z-10 w-full py-4 text-white rounded-lg transition-all duration-300 flex items-center justify-center text-lg font-semibold bg-black ${isNavigatingToSend ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}`}
+                  >
+                    {isNavigatingToSend ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Opening…
+                      </span>
+                    ) : (
+                      'Send →'
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -746,10 +791,48 @@ export default function ContractPage() {
               next[currentSignatureIndex] = data;
               return next;
             });
+            // persist into contract JSON under block 0 signatures
+            try {
+              if (contractJson) {
+                const existing = Array.isArray(contractJson.blocks?.[0]?.signatures) ? contractJson.blocks[0].signatures : [];
+                const updatedSigs = [...existing];
+                updatedSigs[currentSignatureIndex] = {
+                  party: currentSignatureIndex === 0 ? 'PartyA' : 'PartyB',
+                  img_url: data.img_url,
+                  name: data.name,
+                  date: data.date,
+                  index: currentSignatureIndex
+                };
+                const updatedContractJson = {
+                  ...contractJson,
+                  blocks: contractJson.blocks.map((b: any, i: number) => i === 0 ? { ...b, signatures: updatedSigs } : b)
+                };
+                setContractJson(updatedContractJson);
+                // Save to backend
+                fetch(`/api/contracts/${contractId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ content: updatedContractJson, title: updatedContractJson.title })
+                }).catch(() => {});
+              }
+            } catch {}
             setShowSignatureModal(false);
           }}
         />
       )}
+      <style jsx>{`
+        @keyframes rainbowShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .rainbow-glow {
+          background: linear-gradient(45deg, #ff6b6b, #feca57, #54a0ff, #5f27cd, #4ecdc4, #ff9ff3, #ff6b6b);
+          background-size: 400% 400%;
+          animation: rainbowShift 6s ease infinite;
+          filter: blur(8px);
+        }
+      `}</style>
     </div>
   );
 }
