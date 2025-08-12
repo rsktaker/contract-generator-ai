@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -18,6 +18,8 @@ interface ContractEditorProps {
   onRegenerateBlock: (blockIndex: number, userInstructions: string) => void;
   onManualBlockEdit: (blockIndex: number, updatedBlock: any) => void;
   onManualTitleEdit: (newTitle: string) => void;
+  showSignaturesSection?: boolean;
+  signaturesData?: Array<{ img_url: string; name: string; date: string } | null>;
   saveStatus: 'saved' | 'saving' | 'error';
   onShowPreview: () => void;
   onDownloadPDF: () => void;
@@ -154,6 +156,8 @@ export function ContractEditor({
   onRegenerateBlock,
   onManualBlockEdit,
   onManualTitleEdit,
+  showSignaturesSection = false,
+  signaturesData = [null, null],
   saveStatus,
   onShowPreview,
   onDownloadPDF,
@@ -379,9 +383,18 @@ export function ContractEditor({
     );
   }
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (showSignaturesSection && scrollContainerRef.current) {
+      const el = scrollContainerRef.current;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
+  }, [showSignaturesSection]);
+
   return (
     <div className="h-full flex flex-col overflow-hidden mt-1">
-      <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto p-8 py-4 m-3 mb-4 pt-6 ml-5 min-h-0 max-h-full">
+      <div ref={scrollContainerRef} className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto p-8 py-4 m-3 mb-4 pt-6 ml-5 min-h-0 max-h-full">
         <div className="p-8 pt-0.5 max-w-4xl mx-auto w-full">
           <div className="flex-1 flex ml-5 mb-4">
             <SaveStatusIndicator status={saveStatus} />
@@ -461,6 +474,69 @@ export function ContractEditor({
               </div>
             </LexicalComposer>
           </div>
+
+          {/* Signature placeholders (below contract) */}
+          {showSignaturesSection && (
+            <div id="signature-section" className="mt-4 space-y-6 ml-5 flex flex-col">
+              {/* Your Signature */}
+              <div
+                className="relative inline-block bg-blue-50 rounded-lg p-4 font-mono cursor-pointer hover:bg-blue-100 transition-colors mr-30"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSignatureClick(0, 0);
+                }}
+              >
+                <div className="absolute top-3 left-3 text-xs font-medium text-blue-900">Your Signature</div>
+                <div className="space-y-3 mt-6">
+                  <div className="text-md">Name: {signaturesData[0]?.name ? (
+                    <span className="font-normal text-gray-900">{signaturesData[0]?.name}</span>
+                  ) : (
+                    <span className="text-gray-400">_______________</span>
+                  )}
+                  </div>
+                  <div className="text-md">Signature: {signaturesData[0]?.img_url ? (
+                    <img src={signaturesData[0]?.img_url} alt="Your signature" className="inline-block h-12 max-w-64 object-contain bg-white border border-gray-200 rounded p-2" />
+                  ) : (
+                    <span className="text-gray-400">_______________</span>
+                  )}
+                  </div>
+                  <div className="text-md">Date: {signaturesData[0]?.date ? (
+                    <span className="font-normal text-gray-900">{signaturesData[0]?.date}</span>
+                  ) : (
+                    <span className="text-gray-400">_______________</span>
+                  )}
+                  </div>
+                </div>
+              </div>
+              {/* Counterparty Signature */}
+              <div
+                className="relative inline-block bg-red-50 rounded-lg p-4 font-mono cursor-not-allowed"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSignatureClick(0, 1);
+                }}
+              >
+                <div className="absolute top-3 left-3 text-xs font-medium text-red-900">Counterparty Signature</div>
+                <div className="space-y-3 mt-6">
+                  <div className="text-md">Name: {signaturesData[1]?.name ? (
+                    <span className="font-normal text-gray-900">{signaturesData[1]?.name}</span>
+                  ) : (
+                    <span className="text-gray-400">_______________</span>
+                  )}</div>
+                  <div className="text-md">Signature: {signaturesData[1]?.img_url ? (
+                    <img src={signaturesData[1]?.img_url} alt="Counterparty signature" className="inline-block h-12 max-w-64 object-contain bg-white border border-gray-200 rounded p-2" />
+                  ) : (
+                    <span className="text-gray-400">_______________</span>
+                  )}</div>
+                  <div className="text-md">Date: {signaturesData[1]?.date ? (
+                    <span className="font-normal text-gray-900">{signaturesData[1]?.date}</span>
+                  ) : (
+                    <span className="text-gray-400">_______________</span>
+                  )}</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Header from "@/components/Header";
 import { ContractEditor } from './components/ContractEditor';
+import SignatureModal from '@/components/SignatureModal';
 import { ChatInterface } from './components/ChatInterface';
 import { ErrorModal } from './components/ErrorModal';
 import { AnimatedLoading } from './components/AnimatedLoading';
@@ -109,6 +110,11 @@ export default function ContractPage() {
   const [isGeneratingInitialMessage, setIsGeneratingInitialMessage] = useState(true);
   const [isProcessingChatMessage, setIsProcessingChatMessage] = useState(false);
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+  const [showSignaturesSection, setShowSignaturesSection] = useState(false);
+  const [ctaMode, setCtaMode] = useState<'sign' | 'send'>('sign');
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [currentSignatureIndex, setCurrentSignatureIndex] = useState<number | null>(null);
+  const [signaturesData, setSignaturesData] = useState<Array<{ img_url: string; name: string; date: string } | null>>([null, null]);
   const [isReplacingUnknowns, setIsReplacingUnknowns] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [dismissedUnknowns, setDismissedUnknowns] = useState<string[]>([]);
@@ -613,6 +619,18 @@ export default function ContractPage() {
     }
   };
 
+  const appendWitnessAndSignatures = () => {
+    if (!contractJson) return;
+    const witnessLine = '\n\nIN WITNESS WHEREOF, the parties have executed this Agreement as of the date first written above.';
+    const updatedText = (contractJson.blocks?.[0]?.text || '') + witnessLine;
+    const updated = {
+      ...contractJson,
+      blocks: contractJson.blocks.map((b: any, i: number) => i === 0 ? { ...b, text: updatedText } : b)
+    };
+    setContractJson(updated);
+    setShowSignaturesSection(true);
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
@@ -650,6 +668,10 @@ export default function ContractPage() {
               contractJson={contractJson}
               currentParty={"User"}
               onSignatureClick={() => {}}
+              onSignatureClick={(blockIndex: number, signatureIndex: number) => {
+                setCurrentSignatureIndex(signatureIndex);
+                setShowSignatureModal(true);
+              }}
               onRegenerateBlock={handleRegenerateBlock}
               onManualBlockEdit={handleManualBlockEdit}
               onManualTitleEdit={(newTitle: string) => {
@@ -657,6 +679,8 @@ export default function ContractPage() {
                 const updated = { ...contractJson, title: newTitle } as any;
                 setContractJson(updated);
               }}
+              showSignaturesSection={showSignaturesSection}
+              signaturesData={signaturesData}
               saveStatus={saveStatus}
               onShowPreview={() => {}}
               onDownloadPDF={handleDownloadPDF}
@@ -684,17 +708,48 @@ export default function ContractPage() {
 
           {/* Sign Button - Fixed at Bottom */}
           <div className="flex-shrink-0">
-            <button
-              onClick={() => {
-                router.push(`/contracts/${contractId}/sign`);
-              }}
-              className="w-full py-4 text-white rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg bg-black  flex items-center justify-center text-lg font-medium"
-            >
-              Sign →
-            </button>
+            {ctaMode === 'sign' ? (
+              <button
+                onClick={() => {
+                  appendWitnessAndSignatures();
+                  setTimeout(() => setCtaMode('send'), 500);
+                }}
+                className="w-full py-4 text-white rounded-lg transition-all duration-300 bg-black flex items-center justify-center text-lg font-medium"
+              >
+                Sign →
+              </button>
+            ) : (
+              <div className="w-full">
+                <div className="w-full mb-2 text-center text-sm text-gray-500">Ready to send</div>
+                <button
+                  onClick={() => {
+                    router.push(`/contracts/${contractId}/sign`);
+                  }}
+                  className="w-full py-4 text-white rounded-lg transition-all duration-300 hover:scale-105 hover:shadow-lg bg-green-600 hover:bg-green-700 flex items-center justify-center text-lg font-semibold"
+                >
+                  Send →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Signature Modal */}
+      {showSignatureModal && (
+        <SignatureModal
+          onClose={() => setShowSignatureModal(false)}
+          onSave={(data: { img_url: string; name: string; date: string }) => {
+            if (currentSignatureIndex === null) return;
+            setSignaturesData(prev => {
+              const next = [...prev];
+              next[currentSignatureIndex] = data;
+              return next;
+            });
+            setShowSignatureModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
